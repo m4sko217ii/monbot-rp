@@ -17,8 +17,6 @@ const TOKEN     = process.env.TOKEN     || 'TON_TOKEN_ICI';
 const CLIENT_ID = process.env.CLIENT_ID || 'TON_CLIENT_ID_ICI';
 const SITE_URL  = process.env.SITE_URL  || 'http://localhost:3000';
 
-// ─── VÉRIFICATION ABONNEMENT ─────────────────────────────────────────────────
-// Commandes qui NE nécessitent PAS d'abonnement
 const FREE_COMMANDS = ['setup'];
 
 async function checkSubscription(userId) {
@@ -30,19 +28,18 @@ async function checkSubscription(userId) {
   }
 }
 
-function noSubEmbed(daysLeft = null, siteUrl = SITE_URL) {
-  const desc = daysLeft === null
-    ? `Tu n'as pas d'abonnement actif.\nAbonne-toi sur **[notre site](${siteUrl})** pour accéder au bot !`
-    : `Ton abonnement a expiré !\nRenouvelle-le sur **[notre site](${siteUrl})**.`;
+function noSubEmbed(siteUrl = SITE_URL) {
   return new EmbedBuilder()
     .setTitle('🔒 Accès refusé — Abonnement requis')
     .setColor(0xe8212a)
-    .setDescription(desc)
-    .addFields({ name: '💳 Prix', value: '10€/mois', inline: true }, { name: '🌐 Site', value: `[Cliquer ici](${siteUrl})`, inline: true })
+    .setDescription(`Tu n\'as pas d\'abonnement actif.\nAbonne-toi sur **[notre site](${siteUrl})** pour accéder au bot !`)
+    .addFields(
+      { name: '💳 Prix', value: '10€/mois', inline: true },
+      { name: '🌐 Site', value: `[Cliquer ici](${siteUrl})`, inline: true }
+    )
     .setFooter({ text: 'Astra RP • Abonnement' });
 }
 
-// ─── BASE DE DONNÉES SIMPLE (JSON) ───────────────────────────────────────────
 const DB_FILE = './database.json';
 
 function loadDB() {
@@ -70,22 +67,18 @@ function getPlayer(db, userId) {
     db.wanted[userId] = { level: 0, reason: null };
     saveDB(db);
   }
-  // Compat: ajouter les champs manquants aux anciens profils
   if (!db.storage[userId]) db.storage[userId] = { unlocked: false, items: {} };
   if (!db.housing[userId]) db.housing[userId] = { has: false, address: null, level: 1 };
   if (db.players[userId].created === undefined) db.players[userId].created = false;
   return db;
 }
 
-// ─── COMMANDES SLASH ──────────────────────────────────────────────────────────
 const commands = [
-  // SETUP
   new SlashCommandBuilder()
     .setName('setup')
     .setDescription('🏙️ Crée tous les salons du serveur Astra RP')
     .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
 
-  // COMPTE BANCAIRE
   new SlashCommandBuilder()
     .setName('compte')
     .setDescription('💳 Voir ton compte bancaire'),
@@ -93,12 +86,12 @@ const commands = [
   new SlashCommandBuilder()
     .setName('virement')
     .setDescription('💸 Effectuer un virement')
-    .addUserOption(o => o.setName('cible').setDescription('Joueur à payer').setRequired(true))
-    .addIntegerOption(o => o.setName('montant').setDescription('Montant en €').setRequired(true).setMinValue(1)),
+    .addUserOption(o => o.setName('cible').setDescription('Joueur a payer').setRequired(true))
+    .addIntegerOption(o => o.setName('montant').setDescription('Montant en euros').setRequired(true).setMinValue(1)),
 
   new SlashCommandBuilder()
     .setName('depot')
-    .setDescription('🏦 Déposer de l\'argent à la banque')
+    .setDescription('🏦 Deposer de l\'argent a la banque')
     .addIntegerOption(o => o.setName('montant').setDescription('Montant').setRequired(true).setMinValue(1)),
 
   new SlashCommandBuilder()
@@ -106,19 +99,17 @@ const commands = [
     .setDescription('💵 Retirer de l\'argent de la banque')
     .addIntegerOption(o => o.setName('montant').setDescription('Montant').setRequired(true).setMinValue(1)),
 
-  // CARTE D'IDENTITÉ
   new SlashCommandBuilder()
     .setName('carte_identite')
-    .setDescription('🪪 Voir ou créer ta carte d\'identité')
+    .setDescription('🪪 Voir ou creer ta carte d\'identite')
     .addUserOption(o => o.setName('joueur').setDescription('Voir la carte d\'un autre joueur')),
 
   new SlashCommandBuilder()
     .setName('setnom')
-    .setDescription('✏️ Définir ton nom RP')
-    .addStringOption(o => o.setName('prenom').setDescription('Prénom').setRequired(true))
+    .setDescription('✏️ Definir ton nom RP')
+    .addStringOption(o => o.setName('prenom').setDescription('Prenom').setRequired(true))
     .addStringOption(o => o.setName('nom').setDescription('Nom de famille').setRequired(true)),
 
-  // PERMIS DE CONDUIRE
   new SlashCommandBuilder()
     .setName('permis')
     .setDescription('🚗 Voir ton permis de conduire')
@@ -128,32 +119,29 @@ const commands = [
     .setName('retirer_points')
     .setDescription('[POLICE] Retirer des points de permis')
     .addUserOption(o => o.setName('joueur').setDescription('Joueur').setRequired(true))
-    .addIntegerOption(o => o.setName('points').setDescription('Points à retirer').setRequired(true).setMinValue(1).setMaxValue(12))
+    .addIntegerOption(o => o.setName('points').setDescription('Points a retirer').setRequired(true).setMinValue(1).setMaxValue(12))
     .addStringOption(o => o.setName('raison').setDescription('Raison').setRequired(true)),
 
   new SlashCommandBuilder()
     .setName('donner_permis')
-    .setDescription('[ADMIN] Donner le permis à un joueur')
+    .setDescription('[ADMIN] Donner le permis a un joueur')
     .addUserOption(o => o.setName('joueur').setDescription('Joueur').setRequired(true))
     .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
 
-  // INVENTAIRE
   new SlashCommandBuilder()
     .setName('inventaire')
     .setDescription('🎒 Voir ton inventaire'),
 
-  // BRAQUAGE
   new SlashCommandBuilder()
     .setName('braquer')
     .setDescription('🔫 Braquer une banque ou un magasin')
     .addStringOption(o => o.setName('cible').setDescription('Cible').setRequired(true)
       .addChoices(
-        { name: '🏦 Banque d'Astra', value: 'banque' },
-        { name: '🏪 Supérette', value: 'superette' },
+        { name: '🏦 Banque d\'Astra', value: 'banque' },
+        { name: '🏪 Superette', value: 'superette' },
         { name: '💊 Pharmacie', value: 'pharmacie' },
       )),
 
-  // POLICE
   new SlashCommandBuilder()
     .setName('wanted')
     .setDescription('[POLICE] Mettre un joueur en wanted')
@@ -169,7 +157,7 @@ const commands = [
   new SlashCommandBuilder()
     .setName('fouille')
     .setDescription('[POLICE] Fouiller un joueur')
-    .addUserOption(o => o.setName('joueur').setDescription('Joueur à fouiller').setRequired(true)),
+    .addUserOption(o => o.setName('joueur').setDescription('Joueur a fouiller').setRequired(true)),
 
   new SlashCommandBuilder()
     .setName('amende')
@@ -178,17 +166,16 @@ const commands = [
     .addIntegerOption(o => o.setName('montant').setDescription('Montant de l\'amende').setRequired(true).setMinValue(100))
     .addStringOption(o => o.setName('raison').setDescription('Raison').setRequired(true)),
 
-  // DROGUE
   new SlashCommandBuilder()
     .setName('dealer')
     .setDescription('💊 Vendre de la drogue')
     .addStringOption(o => o.setName('type').setDescription('Type de drogue').setRequired(true)
       .addChoices(
         { name: '🌿 Weed', value: 'weed' },
-        { name: '❄️ Cocaïne', value: 'cocaine' },
+        { name: '❄️ Cocaine', value: 'cocaine' },
         { name: '💊 Pilules', value: 'pilules' },
       ))
-    .addIntegerOption(o => o.setName('quantite').setDescription('Quantité').setRequired(true).setMinValue(1)),
+    .addIntegerOption(o => o.setName('quantite').setDescription('Quantite').setRequired(true).setMinValue(1)),
 
   new SlashCommandBuilder()
     .setName('fabriquer_drogue')
@@ -196,14 +183,13 @@ const commands = [
     .addStringOption(o => o.setName('type').setDescription('Type').setRequired(true)
       .addChoices(
         { name: '🌿 Weed', value: 'weed' },
-        { name: '❄️ Cocaïne', value: 'cocaine' },
+        { name: '❄️ Cocaine', value: 'cocaine' },
         { name: '💊 Pilules', value: 'pilules' },
       )),
 
-  // FABRICATION D'ARMES
   new SlashCommandBuilder()
     .setName('fabriquer_arme')
-    .setDescription('🔧 Fabriquer une arme illégalement')
+    .setDescription('🔧 Fabriquer une arme illegalement')
     .addStringOption(o => o.setName('arme').setDescription('Type d\'arme').setRequired(true)
       .addChoices(
         { name: '🔫 Pistolet', value: 'pistolet' },
@@ -214,8 +200,8 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('vendre_arme')
-    .setDescription('🔫 Vendre une arme au marché noir')
-    .addStringOption(o => o.setName('arme').setDescription('Arme à vendre').setRequired(true)
+    .setDescription('🔫 Vendre une arme au marche noir')
+    .addStringOption(o => o.setName('arme').setDescription('Arme a vendre').setRequired(true)
       .addChoices(
         { name: '🔫 Pistolet', value: 'pistolet' },
         { name: '🔫 Uzi', value: 'uzi' },
@@ -223,14 +209,72 @@ const commands = [
         { name: '💣 Grenade', value: 'grenade' },
       )),
 
-  // RACKET
   new SlashCommandBuilder()
     .setName('racketter')
     .setDescription('💰 Racketter un joueur')
     .addUserOption(o => o.setName('cible').setDescription('Victime').setRequired(true))
-    .addIntegerOption(o => o.setName('montant').setDescription('Montant demandé').setRequired(true).setMinValue(100)),
+    .addIntegerOption(o => o.setName('montant').setDescription('Montant demande').setRequired(true).setMinValue(100)),
 
-  // ADMIN
+  new SlashCommandBuilder()
+    .setName('creer_personnage')
+    .setDescription('🎭 Creer ton personnage RP')
+    .addStringOption(o => o.setName('prenom').setDescription('Prenom').setRequired(true))
+    .addStringOption(o => o.setName('nom').setDescription('Nom').setRequired(true))
+    .addIntegerOption(o => o.setName('age').setDescription('Age').setRequired(true).setMinValue(18).setMaxValue(80))
+    .addStringOption(o => o.setName('job').setDescription('Metier de depart').setRequired(true)
+      .addChoices(
+        { name: '👮 Policier', value: 'Policier' },
+        { name: '🚑 Medecin', value: 'Medecin' },
+        { name: '🚕 Chauffeur de taxi', value: 'Chauffeur de taxi' },
+        { name: '🍔 Restaurateur', value: 'Restaurateur' },
+        { name: '🚗 Mecanicien', value: 'Mecanicien' },
+        { name: '💼 Sans emploi', value: 'Sans emploi' },
+      )),
+
+  new SlashCommandBuilder()
+    .setName('profil')
+    .setDescription('👤 Voir ton profil RP')
+    .addUserOption(o => o.setName('joueur').setDescription('Voir le profil d\'un autre joueur')),
+
+  new SlashCommandBuilder()
+    .setName('acheter_stockage')
+    .setDescription('📦 Acheter un entrepot (5000€)'),
+
+  new SlashCommandBuilder()
+    .setName('stockage')
+    .setDescription('📦 Voir ton entrepot'),
+
+  new SlashCommandBuilder()
+    .setName('deposer_item')
+    .setDescription('📦 Deposer un item dans ton entrepot')
+    .addStringOption(o => o.setName('item').setDescription('Nom de l\'item').setRequired(true))
+    .addIntegerOption(o => o.setName('quantite').setDescription('Quantite').setRequired(true).setMinValue(1)),
+
+  new SlashCommandBuilder()
+    .setName('retirer_item')
+    .setDescription('📦 Retirer un item de ton entrepot')
+    .addStringOption(o => o.setName('item').setDescription('Nom de l\'item').setRequired(true))
+    .addIntegerOption(o => o.setName('quantite').setDescription('Quantite').setRequired(true).setMinValue(1)),
+
+  new SlashCommandBuilder()
+    .setName('acheter_maison')
+    .setDescription('🏠 Acheter une propriete')
+    .addStringOption(o => o.setName('type').setDescription('Type de bien').setRequired(true)
+      .addChoices(
+        { name: '🏠 Studio - 10 000€', value: 'studio' },
+        { name: '🏡 Appartement - 35 000€', value: 'appartement' },
+        { name: '🏰 Villa - 120 000€', value: 'villa' },
+        { name: '🏯 Manoir - 500 000€', value: 'manoir' },
+      )),
+
+  new SlashCommandBuilder()
+    .setName('maison')
+    .setDescription('🏠 Voir ta propriete'),
+
+  new SlashCommandBuilder()
+    .setName('vendre_maison')
+    .setDescription('🏚️ Vendre ta propriete'),
+
   new SlashCommandBuilder()
     .setName('addmoney')
     .setDescription('[ADMIN] Ajouter de l\'argent')
@@ -239,27 +283,60 @@ const commands = [
     .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
 
   new SlashCommandBuilder()
-    .setName('setjob')
-    .setDescription('[ADMIN] Définir le métier d\'un joueur')
+    .setName('removemoney')
+    .setDescription('[ADMIN] Retirer de l\'argent')
     .addUserOption(o => o.setName('joueur').setDescription('Joueur').setRequired(true))
-    .addStringOption(o => o.setName('job').setDescription('Métier').setRequired(true))
+    .addIntegerOption(o => o.setName('montant').setDescription('Montant').setRequired(true))
+    .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
+
+  new SlashCommandBuilder()
+    .setName('setjob')
+    .setDescription('[ADMIN] Definir le metier d\'un joueur')
+    .addUserOption(o => o.setName('joueur').setDescription('Joueur').setRequired(true))
+    .addStringOption(o => o.setName('job').setDescription('Metier').setRequired(true))
+    .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
+
+  new SlashCommandBuilder()
+    .setName('giveitem')
+    .setDescription('[ADMIN] Donner un item a un joueur')
+    .addUserOption(o => o.setName('joueur').setDescription('Joueur').setRequired(true))
+    .addStringOption(o => o.setName('item').setDescription('Item').setRequired(true))
+    .addIntegerOption(o => o.setName('quantite').setDescription('Quantite').setRequired(true).setMinValue(1))
+    .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
+
+  new SlashCommandBuilder()
+    .setName('removeitem')
+    .setDescription('[ADMIN] Retirer un item d\'un joueur')
+    .addUserOption(o => o.setName('joueur').setDescription('Joueur').setRequired(true))
+    .addStringOption(o => o.setName('item').setDescription('Item').setRequired(true))
+    .addIntegerOption(o => o.setName('quantite').setDescription('Quantite').setRequired(true).setMinValue(1))
+    .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
+
+  new SlashCommandBuilder()
+    .setName('resetplayer')
+    .setDescription('[ADMIN] Reinitialiser un joueur')
+    .addUserOption(o => o.setName('joueur').setDescription('Joueur').setRequired(true))
+    .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
+
+  new SlashCommandBuilder()
+    .setName('admininfo')
+    .setDescription('[ADMIN] Voir toutes les infos d\'un joueur')
+    .addUserOption(o => o.setName('joueur').setDescription('Joueur').setRequired(true))
     .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
 ];
 
-// ─── ENREGISTREMENT DES COMMANDES ─────────────────────────────────────────────
 const rest = new REST({ version: '10' }).setToken(TOKEN);
 
 client.once('ready', async () => {
-  console.log(`✅ Bot connecté en tant que ${client.user.tag}`);
+  console.log(`✅ Bot connecte en tant que ${client.user.tag}`);
   try {
     await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands.map(c => c.toJSON()) });
-    console.log('✅ Commandes slash enregistrées !');
+    console.log('✅ Commandes slash enregistrees !');
   } catch (err) {
     console.error(err);
   }
 });
 
-// ─── GESTION DES INTERACTIONS ─────────────────────────────────────────────────
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -269,7 +346,6 @@ client.on('interactionCreate', async interaction => {
 
   const { commandName } = interaction;
 
-  // ── VÉRIFICATION ABONNEMENT ──
   if (!FREE_COMMANDS.includes(commandName)) {
     const sub = await checkSubscription(userId);
     if (!sub.access) {
@@ -280,99 +356,62 @@ client.on('interactionCreate', async interaction => {
     }
   }
 
-  // ══════════════════════════════════════════
-  //  SETUP
-  // ══════════════════════════════════════════
   if (commandName === 'setup') {
     await interaction.deferReply();
     const guild = interaction.guild;
-
     const categories = [
-      {
-        name: '🏙️ ─ LOS SANTOS RP',
-        channels: [
-          { name: '📋・règlement', type: ChannelType.GuildText },
-          { name: '📢・annonces', type: ChannelType.GuildText },
-          { name: '✅・vérification', type: ChannelType.GuildText },
-          { name: '🗺️・présentation', type: ChannelType.GuildText },
-        ]
-      },
-      {
-        name: '💬 ─ GÉNÉRAL',
-        channels: [
-          { name: '💬・général', type: ChannelType.GuildText },
-          { name: '🖼️・médias', type: ChannelType.GuildText },
-          { name: '🎮・hors-rp', type: ChannelType.GuildText },
-          { name: '🤝・recrutement', type: ChannelType.GuildText },
-          { name: '🎤・vocal-général', type: ChannelType.GuildVoice },
-          { name: '🎮・gaming', type: ChannelType.GuildVoice },
-        ]
-      },
-      {
-        name: '🏦 ─ ÉCONOMIE & BANQUE',
-        channels: [
-          { name: '💳・compte-bancaire', type: ChannelType.GuildText },
-          { name: '🏪・marché', type: ChannelType.GuildText },
-          { name: '💼・offres-emploi', type: ChannelType.GuildText },
-        ]
-      },
-      {
-        name: '🚔 ─ LSPD - POLICE',
-        channels: [
-          { name: '🚔・quartier-général', type: ChannelType.GuildText },
-          { name: '📋・rapports-police', type: ChannelType.GuildText },
-          { name: '🔍・avis-recherche', type: ChannelType.GuildText },
-          { name: '🎤・briefing-police', type: ChannelType.GuildVoice },
-        ]
-      },
-      {
-        name: '⚕️ ─ EMS - MÉDECINS',
-        channels: [
-          { name: '🏥・urgences', type: ChannelType.GuildText },
-          { name: '📋・rapports-médicaux', type: ChannelType.GuildText },
-          { name: '🎤・ems-vocal', type: ChannelType.GuildVoice },
-        ]
-      },
-      {
-        name: '🌿 ─ CRIMINEL',
-        channels: [
-          { name: '💊・marché-noir', type: ChannelType.GuildText },
-          { name: '🔫・armurerie-illégale', type: ChannelType.GuildText },
-          { name: '🤝・deals', type: ChannelType.GuildText },
-          { name: '🎤・criminel-vocal', type: ChannelType.GuildVoice },
-        ]
-      },
-      {
-        name: '📋 ─ ADMINISTRATION',
-        channels: [
-          { name: '🛠️・staff-général', type: ChannelType.GuildText },
-          { name: '📩・demandes', type: ChannelType.GuildText },
-          { name: '🔨・sanctions', type: ChannelType.GuildText },
-          { name: '🎤・staff-vocal', type: ChannelType.GuildVoice },
-        ]
-      },
+      { name: '🏙️ ─ LOS SANTOS RP', channels: [
+        { name: '📋・reglement', type: ChannelType.GuildText },
+        { name: '📢・annonces', type: ChannelType.GuildText },
+        { name: '✅・verification', type: ChannelType.GuildText },
+        { name: '🗺️・presentation', type: ChannelType.GuildText },
+      ]},
+      { name: '💬 ─ GENERAL', channels: [
+        { name: '💬・general', type: ChannelType.GuildText },
+        { name: '🖼️・medias', type: ChannelType.GuildText },
+        { name: '🎮・hors-rp', type: ChannelType.GuildText },
+        { name: '🤝・recrutement', type: ChannelType.GuildText },
+        { name: '🎤・vocal-general', type: ChannelType.GuildVoice },
+        { name: '🎮・gaming', type: ChannelType.GuildVoice },
+      ]},
+      { name: '🏦 ─ ECONOMIE & BANQUE', channels: [
+        { name: '💳・compte-bancaire', type: ChannelType.GuildText },
+        { name: '🏪・marche', type: ChannelType.GuildText },
+        { name: '💼・offres-emploi', type: ChannelType.GuildText },
+      ]},
+      { name: '🚔 ─ LSPD - POLICE', channels: [
+        { name: '🚔・quartier-general', type: ChannelType.GuildText },
+        { name: '📋・rapports-police', type: ChannelType.GuildText },
+        { name: '🔍・avis-recherche', type: ChannelType.GuildText },
+        { name: '🎤・briefing-police', type: ChannelType.GuildVoice },
+      ]},
+      { name: '⚕️ ─ EMS - MEDECINS', channels: [
+        { name: '🏥・urgences', type: ChannelType.GuildText },
+        { name: '📋・rapports-medicaux', type: ChannelType.GuildText },
+        { name: '🎤・ems-vocal', type: ChannelType.GuildVoice },
+      ]},
+      { name: '🌿 ─ CRIMINEL', channels: [
+        { name: '💊・marche-noir', type: ChannelType.GuildText },
+        { name: '🔫・armurerie-illegale', type: ChannelType.GuildText },
+        { name: '🤝・deals', type: ChannelType.GuildText },
+        { name: '🎤・criminel-vocal', type: ChannelType.GuildVoice },
+      ]},
+      { name: '📋 ─ ADMINISTRATION', channels: [
+        { name: '🛠️・staff-general', type: ChannelType.GuildText },
+        { name: '📩・demandes', type: ChannelType.GuildText },
+        { name: '🔨・sanctions', type: ChannelType.GuildText },
+        { name: '🎤・staff-vocal', type: ChannelType.GuildVoice },
+      ]},
     ];
-
     for (const cat of categories) {
       const category = await guild.channels.create({ name: cat.name, type: ChannelType.GuildCategory });
       for (const ch of cat.channels) {
         await guild.channels.create({ name: ch.name, type: ch.type, parent: category.id });
       }
     }
-
-    const embed = new EmbedBuilder()
-      .setTitle('✅ Serveur Astra RP configuré !')
-      .setDescription('Tous les salons ont été créés avec succès.\nBienvenue sur **Astra RP** 🌌')
-      .setColor(0x00ff88)
-      .setThumbnail('https://cdn.discordapp.com/emojis/gtav.png')
-      .setFooter({ text: 'Astra RP • Setup complet' });
-
-    await interaction.editReply({ embeds: [embed] });
+    await interaction.editReply({ embeds: [new EmbedBuilder().setTitle('✅ Serveur Astra RP configure !').setDescription('Tous les salons ont ete crees avec succes.').setColor(0x00ff88).setTimestamp()] });
   }
 
-  // ══════════════════════════════════════════
-  //  COMPTE BANCAIRE
-  // ══════════════════════════════════════════
   else if (commandName === 'compte') {
     const bank = db.bank[userId];
     const player = db.players[userId];
@@ -385,7 +424,7 @@ client.on('interactionCreate', async interaction => {
         { name: '🏦 Argent en banque', value: `${bank.bank.toLocaleString()} €`, inline: true },
         { name: '💰 Total', value: `${(bank.cash + bank.bank).toLocaleString()} €`, inline: true },
       )
-      .setFooter({ text: 'Banque d'Astra' })
+      .setFooter({ text: 'Banque d\'Astra' })
       .setTimestamp();
     await interaction.reply({ embeds: [embed], ephemeral: true });
   }
@@ -394,22 +433,15 @@ client.on('interactionCreate', async interaction => {
     const cible = interaction.options.getUser('cible');
     const montant = interaction.options.getInteger('montant');
     getPlayer(db, cible.id);
-    if (db.bank[userId].cash < montant) {
-      return interaction.reply({ content: '❌ Tu n\'as pas assez d\'argent sur toi !', ephemeral: true });
-    }
+    if (db.bank[userId].cash < montant) return interaction.reply({ content: '❌ Tu n\'as pas assez d\'argent sur toi !', ephemeral: true });
     db.bank[userId].cash -= montant;
     db.bank[cible.id].cash += montant;
     saveDB(db);
-    const embed = new EmbedBuilder()
-      .setTitle('💸 Virement effectué')
-      .setColor(0x00ff88)
-      .addFields(
-        { name: 'De', value: `<@${userId}>`, inline: true },
-        { name: 'Vers', value: `<@${cible.id}>`, inline: true },
-        { name: 'Montant', value: `${montant.toLocaleString()} €`, inline: true },
-      )
-      .setTimestamp();
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('💸 Virement effectue').setColor(0x00ff88).addFields(
+      { name: 'De', value: `<@${userId}>`, inline: true },
+      { name: 'Vers', value: `<@${cible.id}>`, inline: true },
+      { name: 'Montant', value: `${montant.toLocaleString()} €`, inline: true },
+    ).setTimestamp()] });
   }
 
   else if (commandName === 'depot') {
@@ -418,7 +450,7 @@ client.on('interactionCreate', async interaction => {
     db.bank[userId].cash -= montant;
     db.bank[userId].bank += montant;
     saveDB(db);
-    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('🏦 Dépôt effectué').setColor(0x00ff88).setDescription(`**+${montant} €** déposés en banque.`).setTimestamp()] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('🏦 Depot effectue').setColor(0x00ff88).setDescription(`**+${montant} €** deposes en banque.`).setTimestamp()] });
   }
 
   else if (commandName === 'retrait') {
@@ -427,12 +459,9 @@ client.on('interactionCreate', async interaction => {
     db.bank[userId].bank -= montant;
     db.bank[userId].cash += montant;
     saveDB(db);
-    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('💵 Retrait effectué').setColor(0x00ff88).setDescription(`**${montant} €** retirés de la banque.`).setTimestamp()] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('💵 Retrait effectue').setColor(0x00ff88).setDescription(`**${montant} €** retires de la banque.`).setTimestamp()] });
   }
 
-  // ══════════════════════════════════════════
-  //  CARTE D'IDENTITÉ
-  // ══════════════════════════════════════════
   else if (commandName === 'setnom') {
     const prenom = interaction.options.getString('prenom');
     const nom = interaction.options.getString('nom');
@@ -448,24 +477,21 @@ client.on('interactionCreate', async interaction => {
     const l = db.driving_license[cible.id];
     const w = db.wanted[cible.id];
     const embed = new EmbedBuilder()
-      .setTitle('🪪 Carte d\'Identité — Los Santos')
+      .setTitle('🪪 Carte d\'Identite — Los Santos')
       .setColor(0xffd700)
       .setThumbnail(cible.displayAvatarURL())
       .addFields(
-        { name: '👤 Nom complet', value: p.name || '*Non défini* (use /setnom)', inline: true },
-        { name: '💼 Métier', value: p.job, inline: true },
+        { name: '👤 Nom complet', value: p.name || '*Non defini* (use /setnom)', inline: true },
+        { name: '💼 Metier', value: p.job, inline: true },
         { name: '⭐ Niveau', value: `${p.level}`, inline: true },
         { name: '🚗 Permis', value: l.has ? `✅ Valide — **${l.points}/12 pts**` : '❌ Pas de permis', inline: true },
-        { name: '🔴 Wanted', value: w.level > 0 ? `⭐`.repeat(w.level) + ` (${w.reason})` : '✅ Aucun', inline: true },
+        { name: '🔴 Wanted', value: w.level > 0 ? `${'⭐'.repeat(w.level)} (${w.reason})` : '✅ Aucun', inline: true },
       )
-      .setFooter({ text: 'Astra RP Police • ID vérifiée' })
+      .setFooter({ text: 'Astra RP Police • ID verifiee' })
       .setTimestamp();
     await interaction.reply({ embeds: [embed] });
   }
 
-  // ══════════════════════════════════════════
-  //  PERMIS DE CONDUIRE
-  // ══════════════════════════════════════════
   else if (commandName === 'permis') {
     const cible = interaction.options.getUser('joueur') || interaction.user;
     getPlayer(db, cible.id);
@@ -481,7 +507,7 @@ client.on('interactionCreate', async interaction => {
         { name: '📋 Statut', value: l.has ? '✅ Valide' : '❌ Non obtenu', inline: true },
         { name: '⭐ Points', value: `${l.points}/12\n${pointsBar}`, inline: false },
       )
-      .setFooter({ text: 'Astra RP • Contrôle de permis' })
+      .setFooter({ text: 'Astra RP • Controle de permis' })
       .setTimestamp();
     await interaction.reply({ embeds: [embed] });
   }
@@ -492,7 +518,7 @@ client.on('interactionCreate', async interaction => {
     db.driving_license[cible.id].has = true;
     db.driving_license[cible.id].points = 12;
     saveDB(db);
-    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('🚗 Permis délivré').setColor(0x00ff88).setDescription(`<@${cible.id}> a obtenu son permis de conduire !`)] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('🚗 Permis delivre').setColor(0x00ff88).setDescription(`<@${cible.id}> a obtenu son permis de conduire !`)] });
   }
 
   else if (commandName === 'retirer_points') {
@@ -504,91 +530,52 @@ client.on('interactionCreate', async interaction => {
     db.driving_license[cible.id].points = Math.max(0, db.driving_license[cible.id].points - points);
     if (db.driving_license[cible.id].points === 0) db.driving_license[cible.id].has = false;
     saveDB(db);
-    const embed = new EmbedBuilder()
-      .setTitle('🚔 Retrait de points de permis')
-      .setColor(0xff6600)
-      .addFields(
-        { name: '👮 Officier', value: `<@${userId}>`, inline: true },
-        { name: '🎯 Conducteur', value: `<@${cible.id}>`, inline: true },
-        { name: '➖ Points retirés', value: `${points} pts`, inline: true },
-        { name: '📋 Raison', value: raison },
-        { name: '📊 Points restants', value: `${db.driving_license[cible.id].points}/12`, inline: true },
-      )
-      .setTimestamp();
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('🚔 Retrait de points de permis').setColor(0xff6600).addFields(
+      { name: '👮 Officier', value: `<@${userId}>`, inline: true },
+      { name: '🎯 Conducteur', value: `<@${cible.id}>`, inline: true },
+      { name: '➖ Points retires', value: `${points} pts`, inline: true },
+      { name: '📋 Raison', value: raison },
+      { name: '📊 Points restants', value: `${db.driving_license[cible.id].points}/12`, inline: true },
+    ).setTimestamp()] });
   }
 
-  // ══════════════════════════════════════════
-  //  INVENTAIRE
-  // ══════════════════════════════════════════
   else if (commandName === 'inventaire') {
     const inv = db.inventory[userId];
     const items = Object.entries(inv).map(([item, qty]) => `• **${item}** x${qty}`).join('\n') || '*Inventaire vide*';
-    const embed = new EmbedBuilder()
-      .setTitle('🎒 Inventaire')
-      .setColor(0x8b4513)
-      .setDescription(items)
-      .setFooter({ text: 'Astra RP • Inventaire' })
-      .setTimestamp();
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('🎒 Inventaire').setColor(0x8b4513).setDescription(items).setFooter({ text: 'Astra RP • Inventaire' }).setTimestamp()], ephemeral: true });
   }
 
-  // ══════════════════════════════════════════
-  //  BRAQUAGE
-  // ══════════════════════════════════════════
   else if (commandName === 'braquer') {
     const cible = interaction.options.getString('cible');
-    const cooldown = 15 * 60 * 1000; // 15 min
+    const cooldown = 15 * 60 * 1000;
     const now = Date.now();
     if (!db.players[userId].lastBraquage) db.players[userId].lastBraquage = 0;
     const diff = now - db.players[userId].lastBraquage;
     if (diff < cooldown) {
       const reste = Math.ceil((cooldown - diff) / 60000);
-      return interaction.reply({ content: `⏳ Tu dois attendre encore **${reste} minutes** avant de braquer à nouveau !`, ephemeral: true });
+      return interaction.reply({ content: `⏳ Tu dois attendre encore **${reste} minutes** avant de braquer a nouveau !`, ephemeral: true });
     }
-
-    const butin = {
-      banque: Math.floor(Math.random() * 50000) + 20000,
-      superette: Math.floor(Math.random() * 3000) + 500,
-      pharmacie: Math.floor(Math.random() * 5000) + 1000,
-    };
+    const butin = { banque: Math.floor(Math.random() * 50000) + 20000, superette: Math.floor(Math.random() * 3000) + 500, pharmacie: Math.floor(Math.random() * 5000) + 1000 };
     const risk = Math.random();
     db.players[userId].lastBraquage = now;
-
     if (risk < 0.35) {
-      // ÉCHEC
       db.wanted[userId].level = Math.min(5, db.wanted[userId].level + 2);
       db.wanted[userId].reason = `Tentative de braquage (${cible})`;
       saveDB(db);
-      const embed = new EmbedBuilder()
-        .setTitle('🚨 Braquage échoué !')
-        .setColor(0xff0000)
-        .setDescription(`Tu t'es fait repérer ! La police est en route...\n🔴 Wanted niveau **${db.wanted[userId].level}** ajouté !`)
-        .setTimestamp();
-      return interaction.reply({ embeds: [embed] });
+      return interaction.reply({ embeds: [new EmbedBuilder().setTitle('🚨 Braquage echoue !').setColor(0xff0000).setDescription(`Tu t\'es fait reperer ! La police est en route...\n🔴 Wanted niveau **${db.wanted[userId].level}** ajoute !`).setTimestamp()] });
     }
-
     const gain = butin[cible];
     db.bank[userId].cash += gain;
     db.wanted[userId].level = Math.min(5, db.wanted[userId].level + 1);
     db.wanted[userId].reason = `Braquage (${cible})`;
     saveDB(db);
     const emoji = { banque: '🏦', superette: '🏪', pharmacie: '💊' };
-    const embed = new EmbedBuilder()
-      .setTitle(`${emoji[cible]} Braquage réussi !`)
-      .setColor(0x00ff88)
-      .addFields(
-        { name: '💰 Butin', value: `${gain.toLocaleString()} €`, inline: true },
-        { name: '🔴 Wanted', value: `Niveau ${db.wanted[userId].level}`, inline: true },
-      )
-      .setFooter({ text: 'Attention aux flics...' })
-      .setTimestamp();
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle(`${emoji[cible]} Braquage reussi !`).setColor(0x00ff88).addFields(
+      { name: '💰 Butin', value: `${gain.toLocaleString()} €`, inline: true },
+      { name: '🔴 Wanted', value: `Niveau ${db.wanted[userId].level}`, inline: true },
+    ).setFooter({ text: 'Attention aux flics...' }).setTimestamp()] });
   }
 
-  // ══════════════════════════════════════════
-  //  POLICE
-  // ══════════════════════════════════════════
   else if (commandName === 'wanted') {
     const cible = interaction.options.getUser('joueur');
     const niveau = interaction.options.getInteger('niveau');
@@ -596,19 +583,12 @@ client.on('interactionCreate', async interaction => {
     getPlayer(db, cible.id);
     db.wanted[cible.id] = { level: niveau, reason: raison };
     saveDB(db);
-    const stars = '⭐'.repeat(niveau);
-    const embed = new EmbedBuilder()
-      .setTitle('🚨 AVIS DE RECHERCHE')
-      .setColor(0xff0000)
-      .setThumbnail(cible.displayAvatarURL())
-      .addFields(
-        { name: '🎯 Suspect', value: `<@${cible.id}>`, inline: true },
-        { name: '⭐ Niveau', value: stars, inline: true },
-        { name: '📋 Raison', value: raison },
-        { name: '👮 Officier', value: `<@${userId}>`, inline: true },
-      )
-      .setTimestamp();
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('🚨 AVIS DE RECHERCHE').setColor(0xff0000).setThumbnail(cible.displayAvatarURL()).addFields(
+      { name: '🎯 Suspect', value: `<@${cible.id}>`, inline: true },
+      { name: '⭐ Niveau', value: '⭐'.repeat(niveau), inline: true },
+      { name: '📋 Raison', value: raison },
+      { name: '👮 Officier', value: `<@${userId}>`, inline: true },
+    ).setTimestamp()] });
   }
 
   else if (commandName === 'unwanted') {
@@ -616,7 +596,7 @@ client.on('interactionCreate', async interaction => {
     getPlayer(db, cible.id);
     db.wanted[cible.id] = { level: 0, reason: null };
     saveDB(db);
-    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('✅ Wanted retiré').setColor(0x00ff88).setDescription(`Le wanted de <@${cible.id}> a été retiré.`)] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('✅ Wanted retire').setColor(0x00ff88).setDescription(`Le wanted de <@${cible.id}> a ete retire.`)] });
   }
 
   else if (commandName === 'fouille') {
@@ -624,13 +604,7 @@ client.on('interactionCreate', async interaction => {
     getPlayer(db, cible.id);
     const inv = db.inventory[cible.id];
     const items = Object.entries(inv).map(([item, qty]) => `• **${item}** x${qty}`).join('\n') || '*Rien de suspect*';
-    const embed = new EmbedBuilder()
-      .setTitle('🔍 Résultat de fouille')
-      .setColor(0x1e90ff)
-      .setDescription(`Fouille de <@${cible.id}> par <@${userId}>`)
-      .addFields({ name: '🎒 Objets trouvés', value: items })
-      .setTimestamp();
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('🔍 Resultat de fouille').setColor(0x1e90ff).setDescription(`Fouille de <@${cible.id}> par <@${userId}>`).addFields({ name: '🎒 Objets trouves', value: items }).setTimestamp()] });
   }
 
   else if (commandName === 'amende') {
@@ -638,59 +612,38 @@ client.on('interactionCreate', async interaction => {
     const montant = interaction.options.getInteger('montant');
     const raison = interaction.options.getString('raison');
     getPlayer(db, cible.id);
-    if (db.bank[cible.id].cash >= montant) {
-      db.bank[cible.id].cash -= montant;
-    } else if (db.bank[cible.id].bank >= montant) {
-      db.bank[cible.id].bank -= montant;
-    } else {
-      db.bank[cible.id].cash = 0;
-      db.bank[cible.id].bank = 0;
-    }
+    if (db.bank[cible.id].cash >= montant) { db.bank[cible.id].cash -= montant; }
+    else if (db.bank[cible.id].bank >= montant) { db.bank[cible.id].bank -= montant; }
+    else { db.bank[cible.id].cash = 0; db.bank[cible.id].bank = 0; }
     saveDB(db);
-    const embed = new EmbedBuilder()
-      .setTitle('💸 Amende émise')
-      .setColor(0xff6600)
-      .addFields(
-        { name: '🎯 Contrevenant', value: `<@${cible.id}>`, inline: true },
-        { name: '💵 Montant', value: `${montant.toLocaleString()} €`, inline: true },
-        { name: '📋 Raison', value: raison },
-        { name: '👮 Officier', value: `<@${userId}>`, inline: true },
-      )
-      .setTimestamp();
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('💸 Amende emise').setColor(0xff6600).addFields(
+      { name: '🎯 Contrevenant', value: `<@${cible.id}>`, inline: true },
+      { name: '💵 Montant', value: `${montant.toLocaleString()} €`, inline: true },
+      { name: '📋 Raison', value: raison },
+      { name: '👮 Officier', value: `<@${userId}>`, inline: true },
+    ).setTimestamp()] });
   }
 
-  // ══════════════════════════════════════════
-  //  DROGUE
-  // ══════════════════════════════════════════
   else if (commandName === 'fabriquer_drogue') {
     const type = interaction.options.getString('type');
     const cout = { weed: 200, cocaine: 800, pilules: 400 };
     const emoji = { weed: '🌿', cocaine: '❄️', pilules: '💊' };
-    const chance = Math.random();
     if (db.bank[userId].cash < cout[type]) return interaction.reply({ content: `❌ Il te faut **${cout[type]} €** pour fabriquer cette drogue !`, ephemeral: true });
     db.bank[userId].cash -= cout[type];
-    if (chance < 0.2) {
-      saveDB(db);
+    if (Math.random() < 0.2) {
       db.wanted[userId].level = Math.min(5, db.wanted[userId].level + 1);
       db.wanted[userId].reason = 'Fabrication de drogue';
       saveDB(db);
-      return interaction.reply({ embeds: [new EmbedBuilder().setTitle('💥 Fabrication ratée !').setColor(0xff0000).setDescription('L\'explosion a alerté la police ! +1 Wanted').setTimestamp()] });
+      return interaction.reply({ embeds: [new EmbedBuilder().setTitle('💥 Fabrication ratee !').setColor(0xff0000).setDescription('L\'explosion a alerte la police ! +1 Wanted').setTimestamp()] });
     }
     if (!db.inventory[userId][`${emoji[type]} ${type}`]) db.inventory[userId][`${emoji[type]} ${type}`] = 0;
     db.inventory[userId][`${emoji[type]} ${type}`] += 5;
     saveDB(db);
-    const embed = new EmbedBuilder()
-      .setTitle(`${emoji[type]} Drogue fabriquée !`)
-      .setColor(0x8b008b)
-      .addFields(
-        { name: 'Produit', value: `${emoji[type]} ${type}`, inline: true },
-        { name: 'Quantité', value: '5 unités', inline: true },
-        { name: '💸 Coût', value: `${cout[type]} €`, inline: true },
-      )
-      .setFooter({ text: 'Astra RP • Marché noir' })
-      .setTimestamp();
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle(`${emoji[type]} Drogue fabriquee !`).setColor(0x8b008b).addFields(
+      { name: 'Produit', value: `${emoji[type]} ${type}`, inline: true },
+      { name: 'Quantite', value: '5 unites', inline: true },
+      { name: '💸 Cout', value: `${cout[type]} €`, inline: true },
+    ).setTimestamp()] });
   }
 
   else if (commandName === 'dealer') {
@@ -699,63 +652,43 @@ client.on('interactionCreate', async interaction => {
     const emoji = { weed: '🌿', cocaine: '❄️', pilules: '💊' };
     const prix = { weed: 150, cocaine: 600, pilules: 300 };
     const key = `${emoji[type]} ${type}`;
-    if (!db.inventory[userId][key] || db.inventory[userId][key] < quantite) {
-      return interaction.reply({ content: `❌ Tu n'as pas assez de **${type}** dans ton inventaire !`, ephemeral: true });
-    }
-    const chance = Math.random();
+    if (!db.inventory[userId][key] || db.inventory[userId][key] < quantite) return interaction.reply({ content: `❌ Tu n\'as pas assez de **${type}** dans ton inventaire !`, ephemeral: true });
     db.inventory[userId][key] -= quantite;
-    if (chance < 0.25) {
+    if (Math.random() < 0.25) {
       db.wanted[userId].level = Math.min(5, db.wanted[userId].level + 2);
       db.wanted[userId].reason = 'Deal de drogue';
       saveDB(db);
-      return interaction.reply({ embeds: [new EmbedBuilder().setTitle('🚨 Deal raté !').setColor(0xff0000).setDescription('La police t\'a repéré ! +2 Wanted. Tu as perdu ta marchandise.').setTimestamp()] });
+      return interaction.reply({ embeds: [new EmbedBuilder().setTitle('🚨 Deal rate !').setColor(0xff0000).setDescription('La police t\'a repere ! +2 Wanted. Tu as perdu ta marchandise.').setTimestamp()] });
     }
     const gain = prix[type] * quantite;
     db.bank[userId].cash += gain;
     saveDB(db);
-    const embed = new EmbedBuilder()
-      .setTitle(`${emoji[type]} Deal effectué !`)
-      .setColor(0x8b008b)
-      .addFields(
-        { name: 'Produit', value: `${emoji[type]} ${type} x${quantite}`, inline: true },
-        { name: '💰 Gain', value: `${gain.toLocaleString()} €`, inline: true },
-      )
-      .setTimestamp();
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle(`${emoji[type]} Deal effectue !`).setColor(0x8b008b).addFields(
+      { name: 'Produit', value: `${emoji[type]} ${type} x${quantite}`, inline: true },
+      { name: '💰 Gain', value: `${gain.toLocaleString()} €`, inline: true },
+    ).setTimestamp()] });
   }
 
-  // ══════════════════════════════════════════
-  //  FABRICATION D'ARMES
-  // ══════════════════════════════════════════
   else if (commandName === 'fabriquer_arme') {
     const arme = interaction.options.getString('arme');
     const cout = { pistolet: 1500, uzi: 3000, fusil: 8000, grenade: 2000 };
     const emoji = { pistolet: '🔫', uzi: '🔫', fusil: '🪖', grenade: '💣' };
-    if (db.bank[userId].cash < cout[arme]) {
-      return interaction.reply({ content: `❌ Il te faut **${cout[arme]} €** pour fabriquer cette arme !`, ephemeral: true });
-    }
-    const chance = Math.random();
+    if (db.bank[userId].cash < cout[arme]) return interaction.reply({ content: `❌ Il te faut **${cout[arme]} €** pour fabriquer cette arme !`, ephemeral: true });
     db.bank[userId].cash -= cout[arme];
-    if (chance < 0.3) {
+    if (Math.random() < 0.3) {
       db.wanted[userId].level = Math.min(5, db.wanted[userId].level + 2);
-      db.wanted[userId].reason = 'Fabrication d\'armes illégales';
+      db.wanted[userId].reason = 'Fabrication d\'armes illegales';
       saveDB(db);
-      return interaction.reply({ embeds: [new EmbedBuilder().setTitle('💥 Fabrication échouée !').setColor(0xff0000).setDescription('La police a été alertée ! +2 Wanted. Matériaux perdus.').setTimestamp()] });
+      return interaction.reply({ embeds: [new EmbedBuilder().setTitle('💥 Fabrication echouee !').setColor(0xff0000).setDescription('La police a ete alertee ! +2 Wanted. Materiaux perdus.').setTimestamp()] });
     }
     const key = `${emoji[arme]} ${arme}`;
     if (!db.inventory[userId][key]) db.inventory[userId][key] = 0;
     db.inventory[userId][key] += 1;
     saveDB(db);
-    const embed = new EmbedBuilder()
-      .setTitle(`${emoji[arme]} Arme fabriquée !`)
-      .setColor(0x800000)
-      .addFields(
-        { name: 'Arme', value: `${emoji[arme]} ${arme}`, inline: true },
-        { name: '💸 Coût', value: `${cout[arme].toLocaleString()} €`, inline: true },
-      )
-      .setFooter({ text: '⚠️ Port d\'arme illégal — Risque d\'arrestation' })
-      .setTimestamp();
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle(`${emoji[arme]} Arme fabriquee !`).setColor(0x800000).addFields(
+      { name: 'Arme', value: `${emoji[arme]} ${arme}`, inline: true },
+      { name: '💸 Cout', value: `${cout[arme].toLocaleString()} €`, inline: true },
+    ).setFooter({ text: '⚠️ Port d\'arme illegal — Risque d\'arrestation' }).setTimestamp()] });
   }
 
   else if (commandName === 'vendre_arme') {
@@ -763,128 +696,71 @@ client.on('interactionCreate', async interaction => {
     const emoji = { pistolet: '🔫', uzi: '🔫', fusil: '🪖', grenade: '💣' };
     const prix = { pistolet: 2500, uzi: 5000, fusil: 12000, grenade: 3500 };
     const key = `${emoji[arme]} ${arme}`;
-    if (!db.inventory[userId][key] || db.inventory[userId][key] < 1) {
-      return interaction.reply({ content: `❌ Tu n'as pas de **${arme}** dans ton inventaire !`, ephemeral: true });
-    }
-    const chance = Math.random();
+    if (!db.inventory[userId][key] || db.inventory[userId][key] < 1) return interaction.reply({ content: `❌ Tu n\'as pas de **${arme}** dans ton inventaire !`, ephemeral: true });
     db.inventory[userId][key] -= 1;
-    if (chance < 0.2) {
+    if (Math.random() < 0.2) {
       db.wanted[userId].level = Math.min(5, db.wanted[userId].level + 3);
       db.wanted[userId].reason = 'Trafic d\'armes';
       saveDB(db);
-      return interaction.reply({ embeds: [new EmbedBuilder().setTitle('🚨 Transaction interceptée !').setColor(0xff0000).setDescription('Les flics ont intercepté la vente ! +3 Wanted.').setTimestamp()] });
+      return interaction.reply({ embeds: [new EmbedBuilder().setTitle('🚨 Transaction interceptee !').setColor(0xff0000).setDescription('Les flics ont intercepte la vente ! +3 Wanted.').setTimestamp()] });
     }
     db.bank[userId].cash += prix[arme];
     saveDB(db);
-    const embed = new EmbedBuilder()
-      .setTitle(`${emoji[arme]} Arme vendue au marché noir !`)
-      .setColor(0x800000)
-      .addFields(
-        { name: 'Arme', value: `${emoji[arme]} ${arme}`, inline: true },
-        { name: '💰 Gain', value: `${prix[arme].toLocaleString()} €`, inline: true },
-      )
-      .setTimestamp();
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle(`${emoji[arme]} Arme vendue au marche noir !`).setColor(0x800000).addFields(
+      { name: 'Arme', value: `${emoji[arme]} ${arme}`, inline: true },
+      { name: '💰 Gain', value: `${prix[arme].toLocaleString()} €`, inline: true },
+    ).setTimestamp()] });
   }
 
-  // ══════════════════════════════════════════
-  //  RACKET
-  // ══════════════════════════════════════════
   else if (commandName === 'racketter') {
     const cible = interaction.options.getUser('cible');
     const montant = interaction.options.getInteger('montant');
     getPlayer(db, cible.id);
-    if (cible.id === userId) return interaction.reply({ content: '❌ Tu ne peux pas te racketter toi-même !', ephemeral: true });
-
-    const chance = Math.random();
-    if (chance < 0.3) {
+    if (cible.id === userId) return interaction.reply({ content: '❌ Tu ne peux pas te racketter toi-meme !', ephemeral: true });
+    if (Math.random() < 0.3) {
       db.wanted[userId].level = Math.min(5, db.wanted[userId].level + 1);
       db.wanted[userId].reason = 'Tentative de racket';
       saveDB(db);
-      return interaction.reply({ embeds: [new EmbedBuilder().setTitle('❌ Racket échoué !').setColor(0xff0000).setDescription(`<@${cible.id}> t'a résisté et a appelé la police ! +1 Wanted`).setTimestamp()] });
+      return interaction.reply({ embeds: [new EmbedBuilder().setTitle('❌ Racket echoue !').setColor(0xff0000).setDescription(`<@${cible.id}> t\'a resiste et a appele la police ! +1 Wanted`).setTimestamp()] });
     }
-
     const pris = Math.min(montant, db.bank[cible.id].cash);
     db.bank[cible.id].cash -= pris;
     db.bank[userId].cash += pris;
     db.wanted[userId].level = Math.min(5, db.wanted[userId].level + 1);
     db.wanted[userId].reason = 'Racket';
     saveDB(db);
-
-    const embed = new EmbedBuilder()
-      .setTitle('💰 Racket réussi !')
-      .setColor(0xff8c00)
-      .addFields(
-        { name: '🎯 Victime', value: `<@${cible.id}>`, inline: true },
-        { name: '💵 Extorqué', value: `${pris.toLocaleString()} €`, inline: true },
-        { name: '🔴 Wanted', value: `Niveau ${db.wanted[userId].level}`, inline: true },
-      )
-      .setTimestamp();
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('💰 Racket reussi !').setColor(0xff8c00).addFields(
+      { name: '🎯 Victime', value: `<@${cible.id}>`, inline: true },
+      { name: '💵 Extorque', value: `${pris.toLocaleString()} €`, inline: true },
+      { name: '🔴 Wanted', value: `Niveau ${db.wanted[userId].level}`, inline: true },
+    ).setTimestamp()] });
   }
 
-  // ══════════════════════════════════════════
-  //  ADMIN
-  // ══════════════════════════════════════════
-  else if (commandName === 'addmoney') {
-    const cible = interaction.options.getUser('joueur');
-    const montant = interaction.options.getInteger('montant');
-    getPlayer(db, cible.id);
-    db.bank[cible.id].cash += montant;
-    saveDB(db);
-    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('✅ Argent ajouté').setColor(0x00ff88).setDescription(`**${montant.toLocaleString()} €** ajoutés à <@${cible.id}>`).setTimestamp()] });
-  }
-
-  else if (commandName === 'setjob') {
-    const cible = interaction.options.getUser('joueur');
-    const job = interaction.options.getString('job');
-    getPlayer(db, cible.id);
-    db.players[cible.id].job = job;
-    saveDB(db);
-    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('✅ Métier mis à jour').setColor(0x00ff88).setDescription(`<@${cible.id}> est maintenant **${job}**`).setTimestamp()] });
-  }
-
-  // ══════════════════════════════════════════
-  //  CRÉATION DE PERSONNAGE
-  // ══════════════════════════════════════════
   else if (commandName === 'creer_personnage') {
-    if (db.players[userId].created) {
-      return interaction.reply({ content: '❌ Tu as déjà créé ton personnage ! Utilise `/profil` pour le voir.', ephemeral: true });
-    }
+    if (db.players[userId].created) return interaction.reply({ content: '❌ Tu as deja cree ton personnage !', ephemeral: true });
     const prenom = interaction.options.getString('prenom');
-    const nom    = interaction.options.getString('nom');
-    const age    = interaction.options.getInteger('age');
-    const job    = interaction.options.getString('job');
-
-    db.players[userId].prenom  = prenom;
-    db.players[userId].nom     = nom;
-    db.players[userId].name    = `${prenom} ${nom}`;
-    db.players[userId].age     = age;
-    db.players[userId].job     = job;
+    const nom = interaction.options.getString('nom');
+    const age = interaction.options.getInteger('age');
+    const job = interaction.options.getString('job');
+    db.players[userId].prenom = prenom;
+    db.players[userId].nom = nom;
+    db.players[userId].name = `${prenom} ${nom}`;
+    db.players[userId].age = age;
+    db.players[userId].job = job;
     db.players[userId].created = true;
-    db.players[userId].level   = 1;
-    db.players[userId].xp      = 0;
-    db.bank[userId].cash       = 2000;
-    db.bank[userId].bank       = 5000;
+    db.players[userId].level = 1;
+    db.players[userId].xp = 0;
+    db.bank[userId].cash = 2000;
+    db.bank[userId].bank = 5000;
     saveDB(db);
-
-    const jobEmoji = { 'Policier':'👮', 'Médecin':'🚑', 'Chauffeur de taxi':'🚕', 'Restaurateur':'🍔', 'Mécanicien':'🚗', 'Sans emploi':'💼' };
-    const embed = new EmbedBuilder()
-      .setTitle('🎭 Personnage créé — Astra RP')
-      .setColor(0xf5c518)
-      .setThumbnail(interaction.user.displayAvatarURL())
-      .setDescription(`Bienvenue à **Astra RP**, **${prenom} ${nom}** !`)
-      .addFields(
-        { name: '👤 Identité', value: `${prenom} ${nom}`, inline: true },
-        { name: '🎂 Âge', value: `${age} ans`, inline: true },
-        { name: `${jobEmoji[job] || '💼'} Métier`, value: job, inline: true },
-        { name: '💵 Cash de départ', value: '2 000 €', inline: true },
-        { name: '🏦 Banque de départ', value: '5 000 €', inline: true },
-        { name: '⭐ Niveau', value: '1', inline: true },
-      )
-      .setFooter({ text: 'Astra RP • Bonne chance dans ta nouvelle vie !' })
-      .setTimestamp();
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('🎭 Personnage cree — Astra RP').setColor(0xf5c518).setThumbnail(interaction.user.displayAvatarURL()).setDescription(`Bienvenue a **Astra RP**, **${prenom} ${nom}** !`).addFields(
+      { name: '👤 Identite', value: `${prenom} ${nom}`, inline: true },
+      { name: '🎂 Age', value: `${age} ans`, inline: true },
+      { name: '💼 Metier', value: job, inline: true },
+      { name: '💵 Cash de depart', value: '2 000 €', inline: true },
+      { name: '🏦 Banque de depart', value: '5 000 €', inline: true },
+      { name: '⭐ Niveau', value: '1', inline: true },
+    ).setFooter({ text: 'Astra RP • Bonne chance dans ta nouvelle vie !' }).setTimestamp()] });
   }
 
   else if (commandName === 'profil') {
@@ -896,196 +772,155 @@ client.on('interactionCreate', async interaction => {
     const w = db.wanted[cible.id];
     const h = db.housing[cible.id];
     const s = db.storage[cible.id];
-
-    if (!p.created) {
-      return interaction.reply({ content: `❌ <@${cible.id}> n'a pas encore créé son personnage ! Utilise \`/creer_personnage\``, ephemeral: true });
-    }
-
-    const jobEmoji = { 'Policier':'👮', 'Médecin':'🚑', 'Chauffeur de taxi':'🚕', 'Restaurateur':'🍔', 'Mécanicien':'🚗', 'Sans emploi':'💼' };
-    const embed = new EmbedBuilder()
-      .setTitle(`👤 Profil — ${p.name}`)
-      .setColor(0x1e90ff)
-      .setThumbnail(cible.displayAvatarURL())
-      .addFields(
-        { name: '🪪 Identité', value: `${p.prenom} ${p.nom}`, inline: true },
-        { name: '🎂 Âge', value: `${p.age} ans`, inline: true },
-        { name: `${jobEmoji[p.job] || '💼'} Métier`, value: p.job, inline: true },
-        { name: '⭐ Niveau', value: `${p.level}`, inline: true },
-        { name: '💰 Fortune', value: `Cash: **${b.cash.toLocaleString()} €**\nBanque: **${b.bank.toLocaleString()} €**`, inline: true },
-        { name: '🚗 Permis', value: l.has ? `✅ ${l.points}/12 pts` : '❌ Aucun', inline: true },
-        { name: '🏠 Logement', value: h.has ? `✅ ${h.address}` : '❌ Sans domicile', inline: true },
-        { name: '📦 Stockage', value: s.unlocked ? '✅ Débloqué' : '❌ Verrouillé', inline: true },
-        { name: '🔴 Wanted', value: w.level > 0 ? `${'⭐'.repeat(w.level)} — ${w.reason}` : '✅ Aucun', inline: true },
-      )
-      .setFooter({ text: 'Astra RP • Profil joueur' })
-      .setTimestamp();
-    await interaction.reply({ embeds: [embed] });
+    if (!p.created) return interaction.reply({ content: `❌ <@${cible.id}> n\'a pas encore cree son personnage ! Utilise \`/creer_personnage\``, ephemeral: true });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle(`👤 Profil — ${p.name}`).setColor(0x1e90ff).setThumbnail(cible.displayAvatarURL()).addFields(
+      { name: '🪪 Identite', value: `${p.prenom} ${p.nom}`, inline: true },
+      { name: '🎂 Age', value: `${p.age} ans`, inline: true },
+      { name: '💼 Metier', value: p.job, inline: true },
+      { name: '⭐ Niveau', value: `${p.level}`, inline: true },
+      { name: '💰 Fortune', value: `Cash: **${b.cash.toLocaleString()} €**\nBanque: **${b.bank.toLocaleString()} €**`, inline: true },
+      { name: '🚗 Permis', value: l.has ? `✅ ${l.points}/12 pts` : '❌ Aucun', inline: true },
+      { name: '🏠 Logement', value: h.has ? `✅ ${h.address}` : '❌ Sans domicile', inline: true },
+      { name: '📦 Stockage', value: s.unlocked ? '✅ Debloque' : '❌ Verrouille', inline: true },
+      { name: '🔴 Wanted', value: w.level > 0 ? `${'⭐'.repeat(w.level)} — ${w.reason}` : '✅ Aucun', inline: true },
+    ).setFooter({ text: 'Astra RP • Profil joueur' }).setTimestamp()] });
   }
 
-  // ══════════════════════════════════════════
-  //  STOCKAGE
-  // ══════════════════════════════════════════
   else if (commandName === 'acheter_stockage') {
     const cout = 5000;
-    if (db.storage[userId].unlocked) return interaction.reply({ content: '❌ Tu as déjà un entrepôt !', ephemeral: true });
+    if (db.storage[userId].unlocked) return interaction.reply({ content: '❌ Tu as deja un entrepot !', ephemeral: true });
     if (db.bank[userId].cash < cout) return interaction.reply({ content: `❌ Il te faut **${cout.toLocaleString()} €** en cash !`, ephemeral: true });
     db.bank[userId].cash -= cout;
     db.storage[userId].unlocked = true;
     saveDB(db);
-    await interaction.reply({ embeds: [new EmbedBuilder()
-      .setTitle('📦 Entrepôt acheté !')
-      .setColor(0x00ff88)
-      .setDescription(`Tu es maintenant propriétaire d'un entrepôt.\nUtilise \`/deposer_item\` et \`/retirer_item\` pour gérer ton stock.`)
-      .addFields({ name: '💸 Coût', value: `${cout.toLocaleString()} €`, inline: true })
-      .setTimestamp()] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('📦 Entrepot achete !').setColor(0x00ff88).setDescription('Tu es maintenant proprietaire d\'un entrepot.').addFields({ name: '💸 Cout', value: `${cout.toLocaleString()} €`, inline: true }).setTimestamp()] });
   }
 
   else if (commandName === 'stockage') {
-    if (!db.storage[userId].unlocked) return interaction.reply({ content: '❌ Tu n\'as pas d\'entrepôt. Achète-en un avec `/acheter_stockage` !', ephemeral: true });
-    const items = Object.entries(db.storage[userId].items).map(([k, v]) => `• **${k}** x${v}`).join('\n') || '*Entrepôt vide*';
-    await interaction.reply({ embeds: [new EmbedBuilder()
-      .setTitle('📦 Entrepôt — Stockage')
-      .setColor(0x8b4513)
-      .setDescription(items)
-      .setFooter({ text: 'Astra RP • Stockage' })
-      .setTimestamp()], ephemeral: true });
+    if (!db.storage[userId].unlocked) return interaction.reply({ content: '❌ Tu n\'as pas d\'entrepot. Achete-en un avec `/acheter_stockage` !', ephemeral: true });
+    const items = Object.entries(db.storage[userId].items).map(([k, v]) => `• **${k}** x${v}`).join('\n') || '*Entrepot vide*';
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('📦 Entrepot — Stockage').setColor(0x8b4513).setDescription(items).setTimestamp()], ephemeral: true });
   }
 
   else if (commandName === 'deposer_item') {
     const item = interaction.options.getString('item');
-    const qty  = interaction.options.getInteger('quantite');
-    if (!db.storage[userId].unlocked) return interaction.reply({ content: '❌ Tu n\'as pas d\'entrepôt !', ephemeral: true });
-    if (!db.inventory[userId][item] || db.inventory[userId][item] < qty) return interaction.reply({ content: `❌ Tu n'as pas assez de **${item}** dans ton inventaire !`, ephemeral: true });
+    const qty = interaction.options.getInteger('quantite');
+    if (!db.storage[userId].unlocked) return interaction.reply({ content: '❌ Tu n\'as pas d\'entrepot !', ephemeral: true });
+    if (!db.inventory[userId][item] || db.inventory[userId][item] < qty) return interaction.reply({ content: `❌ Tu n\'as pas assez de **${item}** !`, ephemeral: true });
     db.inventory[userId][item] -= qty;
     if (db.inventory[userId][item] <= 0) delete db.inventory[userId][item];
     if (!db.storage[userId].items[item]) db.storage[userId].items[item] = 0;
     db.storage[userId].items[item] += qty;
     saveDB(db);
-    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('📦 Item déposé').setColor(0x00ff88).setDescription(`**${item}** x${qty} → Entrepôt`).setTimestamp()] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('📦 Item depose').setColor(0x00ff88).setDescription(`**${item}** x${qty} → Entrepot`).setTimestamp()] });
   }
 
   else if (commandName === 'retirer_item') {
     const item = interaction.options.getString('item');
-    const qty  = interaction.options.getInteger('quantite');
-    if (!db.storage[userId].unlocked) return interaction.reply({ content: '❌ Tu n\'as pas d\'entrepôt !', ephemeral: true });
-    if (!db.storage[userId].items[item] || db.storage[userId].items[item] < qty) return interaction.reply({ content: `❌ Tu n'as pas assez de **${item}** dans ton entrepôt !`, ephemeral: true });
+    const qty = interaction.options.getInteger('quantite');
+    if (!db.storage[userId].unlocked) return interaction.reply({ content: '❌ Tu n\'as pas d\'entrepot !', ephemeral: true });
+    if (!db.storage[userId].items[item] || db.storage[userId].items[item] < qty) return interaction.reply({ content: `❌ Tu n\'as pas assez de **${item}** dans ton entrepot !`, ephemeral: true });
     db.storage[userId].items[item] -= qty;
     if (db.storage[userId].items[item] <= 0) delete db.storage[userId].items[item];
     if (!db.inventory[userId][item]) db.inventory[userId][item] = 0;
     db.inventory[userId][item] += qty;
     saveDB(db);
-    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('📦 Item retiré').setColor(0x00ff88).setDescription(`**${item}** x${qty} → Inventaire`).setTimestamp()] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('📦 Item retire').setColor(0x00ff88).setDescription(`**${item}** x${qty} → Inventaire`).setTimestamp()] });
   }
 
-  // ══════════════════════════════════════════
-  //  HABITATION
-  // ══════════════════════════════════════════
   else if (commandName === 'acheter_maison') {
     const type = interaction.options.getString('type');
     const biens = {
       studio:      { prix: 10000,  label: '🏠 Studio',      adresse: '12 Rue des Pauvres, Astra' },
       appartement: { prix: 35000,  label: '🏡 Appartement', adresse: '47 Avenue du Soleil, Astra' },
-      villa:       { prix: 120000, label: '🏰 Villa',        adresse: '8 Allée des Riches, Astra Heights' },
+      villa:       { prix: 120000, label: '🏰 Villa',        adresse: '8 Allee des Riches, Astra Heights' },
       manoir:      { prix: 500000, label: '🏯 Manoir',       adresse: '1 Boulevard du Pouvoir, Astra Hills' },
     };
     const bien = biens[type];
-    if (db.housing[userId].has) return interaction.reply({ content: '❌ Tu possèdes déjà une propriété ! Vends-la d\'abord avec `/vendre_maison`.', ephemeral: true });
+    if (db.housing[userId].has) return interaction.reply({ content: '❌ Tu possedes deja une propriete !', ephemeral: true });
     const total = db.bank[userId].cash + db.bank[userId].bank;
-    if (total < bien.prix) return interaction.reply({ content: `❌ Il te faut **${bien.prix.toLocaleString()} €** (cash + banque) !`, ephemeral: true });
-    // Débiter cash puis banque
-    if (db.bank[userId].cash >= bien.prix) {
-      db.bank[userId].cash -= bien.prix;
-    } else {
-      const reste = bien.prix - db.bank[userId].cash;
-      db.bank[userId].cash = 0;
-      db.bank[userId].bank -= reste;
-    }
+    if (total < bien.prix) return interaction.reply({ content: `❌ Il te faut **${bien.prix.toLocaleString()} €** !`, ephemeral: true });
+    if (db.bank[userId].cash >= bien.prix) { db.bank[userId].cash -= bien.prix; }
+    else { const reste = bien.prix - db.bank[userId].cash; db.bank[userId].cash = 0; db.bank[userId].bank -= reste; }
     db.housing[userId] = { has: true, address: bien.adresse, type, label: bien.label, prix: bien.prix, level: 1 };
     saveDB(db);
-    const embed = new EmbedBuilder()
-      .setTitle(`${bien.label} acheté !`)
-      .setColor(0xf5c518)
-      .addFields(
-        { name: '📍 Adresse', value: bien.adresse, inline: false },
-        { name: '💸 Prix payé', value: `${bien.prix.toLocaleString()} €`, inline: true },
-        { name: '🏠 Type', value: bien.label, inline: true },
-      )
-      .setFooter({ text: 'Astra RP • Immobilier' })
-      .setTimestamp();
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle(`${bien.label} achete !`).setColor(0xf5c518).addFields(
+      { name: '📍 Adresse', value: bien.adresse },
+      { name: '💸 Prix paye', value: `${bien.prix.toLocaleString()} €`, inline: true },
+      { name: '🏠 Type', value: bien.label, inline: true },
+    ).setTimestamp()] });
   }
 
   else if (commandName === 'maison') {
     const h = db.housing[userId];
-    if (!h.has) return interaction.reply({ content: '❌ Tu n\'as pas de propriété. Utilise `/acheter_maison` !', ephemeral: true });
-    const embed = new EmbedBuilder()
-      .setTitle(`${h.label || '🏠 Propriété'} — Ma Maison`)
-      .setColor(0xf5c518)
-      .addFields(
-        { name: '📍 Adresse', value: h.address, inline: false },
-        { name: '🏠 Type', value: h.label || h.type, inline: true },
-        { name: '⭐ Niveau', value: `${h.level}`, inline: true },
-        { name: '💰 Valeur estimée', value: `${(h.prix * 0.7).toLocaleString()} €`, inline: true },
-      )
-      .setFooter({ text: 'Astra RP • Propriété' })
-      .setTimestamp();
-    await interaction.reply({ embeds: [embed] });
+    if (!h.has) return interaction.reply({ content: '❌ Tu n\'as pas de propriete. Utilise `/acheter_maison` !', ephemeral: true });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle(`${h.label || '🏠 Propriete'} — Ma Maison`).setColor(0xf5c518).addFields(
+      { name: '📍 Adresse', value: h.address },
+      { name: '🏠 Type', value: h.label || h.type, inline: true },
+      { name: '⭐ Niveau', value: `${h.level}`, inline: true },
+      { name: '💰 Valeur estimee', value: `${(h.prix * 0.7).toLocaleString()} €`, inline: true },
+    ).setTimestamp()] });
   }
 
   else if (commandName === 'vendre_maison') {
     const h = db.housing[userId];
-    if (!h.has) return interaction.reply({ content: '❌ Tu n\'as pas de propriété à vendre !', ephemeral: true });
+    if (!h.has) return interaction.reply({ content: '❌ Tu n\'as pas de propriete a vendre !', ephemeral: true });
     const gain = Math.floor(h.prix * 0.7);
     db.bank[userId].cash += gain;
     db.housing[userId] = { has: false, address: null, level: 1 };
     saveDB(db);
-    await interaction.reply({ embeds: [new EmbedBuilder()
-      .setTitle('🏚️ Propriété vendue')
-      .setColor(0xff6600)
-      .setDescription(`Ta propriété a été vendue pour **${gain.toLocaleString()} €** (70% de la valeur).`)
-      .setTimestamp()] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('🏚️ Propriete vendue').setColor(0xff6600).setDescription(`Ta propriete a ete vendue pour **${gain.toLocaleString()} €** (70% de la valeur).`).setTimestamp()] });
   }
 
-  // ══════════════════════════════════════════
-  //  ADMIN ÉTENDU
-  // ══════════════════════════════════════════
-  else if (commandName === 'removemoney') {
-    const cible  = interaction.options.getUser('joueur');
+  else if (commandName === 'addmoney') {
+    const cible = interaction.options.getUser('joueur');
     const montant = interaction.options.getInteger('montant');
     getPlayer(db, cible.id);
-    const retiré = Math.min(montant, db.bank[cible.id].cash + db.bank[cible.id].bank);
-    if (db.bank[cible.id].cash >= montant) {
-      db.bank[cible.id].cash -= montant;
-    } else {
-      const reste = montant - db.bank[cible.id].cash;
-      db.bank[cible.id].cash = 0;
-      db.bank[cible.id].bank = Math.max(0, db.bank[cible.id].bank - reste);
-    }
+    db.bank[cible.id].cash += montant;
     saveDB(db);
-    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('💸 Argent retiré').setColor(0xff4444).setDescription(`**-${retiré.toLocaleString()} €** retiré à <@${cible.id}>`).setTimestamp()] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('✅ Argent ajoute').setColor(0x00ff88).setDescription(`**${montant.toLocaleString()} €** ajoutes a <@${cible.id}>`).setTimestamp()] });
+  }
+
+  else if (commandName === 'removemoney') {
+    const cible = interaction.options.getUser('joueur');
+    const montant = interaction.options.getInteger('montant');
+    getPlayer(db, cible.id);
+    if (db.bank[cible.id].cash >= montant) { db.bank[cible.id].cash -= montant; }
+    else { const reste = montant - db.bank[cible.id].cash; db.bank[cible.id].cash = 0; db.bank[cible.id].bank = Math.max(0, db.bank[cible.id].bank - reste); }
+    saveDB(db);
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('💸 Argent retire').setColor(0xff4444).setDescription(`**-${montant.toLocaleString()} €** retire a <@${cible.id}>`).setTimestamp()] });
+  }
+
+  else if (commandName === 'setjob') {
+    const cible = interaction.options.getUser('joueur');
+    const job = interaction.options.getString('job');
+    getPlayer(db, cible.id);
+    db.players[cible.id].job = job;
+    saveDB(db);
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('✅ Metier mis a jour').setColor(0x00ff88).setDescription(`<@${cible.id}> est maintenant **${job}**`).setTimestamp()] });
   }
 
   else if (commandName === 'giveitem') {
     const cible = interaction.options.getUser('joueur');
-    const item  = interaction.options.getString('item');
-    const qty   = interaction.options.getInteger('quantite');
+    const item = interaction.options.getString('item');
+    const qty = interaction.options.getInteger('quantite');
     getPlayer(db, cible.id);
     if (!db.inventory[cible.id][item]) db.inventory[cible.id][item] = 0;
     db.inventory[cible.id][item] += qty;
     saveDB(db);
-    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('🎁 Item donné').setColor(0x00ff88).setDescription(`**${item}** x${qty} → <@${cible.id}>`).setTimestamp()] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('🎁 Item donne').setColor(0x00ff88).setDescription(`**${item}** x${qty} → <@${cible.id}>`).setTimestamp()] });
   }
 
   else if (commandName === 'removeitem') {
     const cible = interaction.options.getUser('joueur');
-    const item  = interaction.options.getString('item');
-    const qty   = interaction.options.getInteger('quantite');
+    const item = interaction.options.getString('item');
+    const qty = interaction.options.getInteger('quantite');
     getPlayer(db, cible.id);
-    if (!db.inventory[cible.id][item]) return interaction.reply({ content: `❌ <@${cible.id}> n'a pas de **${item}** !`, ephemeral: true });
+    if (!db.inventory[cible.id][item]) return interaction.reply({ content: `❌ <@${cible.id}> n\'a pas de **${item}** !`, ephemeral: true });
     db.inventory[cible.id][item] = Math.max(0, db.inventory[cible.id][item] - qty);
     if (db.inventory[cible.id][item] === 0) delete db.inventory[cible.id][item];
     saveDB(db);
-    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('🗑️ Item retiré').setColor(0xff4444).setDescription(`**${item}** x${qty} retiré à <@${cible.id}>`).setTimestamp()] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('🗑️ Item retire').setColor(0xff4444).setDescription(`**${item}** x${qty} retire a <@${cible.id}>`).setTimestamp()] });
   }
 
   else if (commandName === 'resetplayer') {
@@ -1098,7 +933,7 @@ client.on('interactionCreate', async interaction => {
     delete db.driving_license[cible.id];
     delete db.wanted[cible.id];
     saveDB(db);
-    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('🔄 Joueur réinitialisé').setColor(0xff4444).setDescription(`Le profil de <@${cible.id}> a été entièrement réinitialisé.`).setTimestamp()] });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle('🔄 Joueur reinitialise').setColor(0xff4444).setDescription(`Le profil de <@${cible.id}> a ete entierement reinitialise.`).setTimestamp()] });
   }
 
   else if (commandName === 'admininfo') {
@@ -1112,27 +947,20 @@ client.on('interactionCreate', async interaction => {
     const s = db.storage[cible.id];
     const inv = Object.entries(db.inventory[cible.id]).map(([k,v]) => `${k} x${v}`).join(', ') || 'Vide';
     const stk = Object.entries(s.items || {}).map(([k,v]) => `${k} x${v}`).join(', ') || 'Vide';
-    const embed = new EmbedBuilder()
-      .setTitle(`🔧 Admin Info — ${p.name || cible.username}`)
-      .setColor(0xf5c518)
-      .setThumbnail(cible.displayAvatarURL())
-      .addFields(
-        { name: '🪪 Nom RP', value: p.name || 'Non créé', inline: true },
-        { name: '🎂 Âge', value: p.age ? `${p.age} ans` : 'N/A', inline: true },
-        { name: '💼 Job', value: p.job, inline: true },
-        { name: '⭐ Niveau', value: `${p.level}`, inline: true },
-        { name: '💵 Cash', value: `${b.cash.toLocaleString()} €`, inline: true },
-        { name: '🏦 Banque', value: `${b.bank.toLocaleString()} €`, inline: true },
-        { name: '🚗 Permis', value: l.has ? `✅ ${l.points}/12pts` : '❌', inline: true },
-        { name: '🏠 Maison', value: h.has ? h.label : '❌', inline: true },
-        { name: '📦 Stockage', value: s.unlocked ? '✅' : '❌', inline: true },
-        { name: '🔴 Wanted', value: w.level > 0 ? `⭐x${w.level} — ${w.reason}` : 'Aucun', inline: true },
-        { name: '🎒 Inventaire', value: inv.length > 200 ? inv.slice(0,200)+'...' : inv },
-        { name: '📦 Entrepôt', value: stk.length > 200 ? stk.slice(0,200)+'...' : stk },
-      )
-      .setFooter({ text: 'Astra RP • Admin Panel' })
-      .setTimestamp();
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle(`🔧 Admin Info — ${p.name || cible.username}`).setColor(0xf5c518).setThumbnail(cible.displayAvatarURL()).addFields(
+      { name: '🪪 Nom RP', value: p.name || 'Non cree', inline: true },
+      { name: '🎂 Age', value: p.age ? `${p.age} ans` : 'N/A', inline: true },
+      { name: '💼 Job', value: p.job, inline: true },
+      { name: '⭐ Niveau', value: `${p.level}`, inline: true },
+      { name: '💵 Cash', value: `${b.cash.toLocaleString()} €`, inline: true },
+      { name: '🏦 Banque', value: `${b.bank.toLocaleString()} €`, inline: true },
+      { name: '🚗 Permis', value: l.has ? `✅ ${l.points}/12pts` : '❌', inline: true },
+      { name: '🏠 Maison', value: h.has ? h.label : '❌', inline: true },
+      { name: '📦 Stockage', value: s.unlocked ? '✅' : '❌', inline: true },
+      { name: '🔴 Wanted', value: w.level > 0 ? `⭐x${w.level} — ${w.reason}` : 'Aucun', inline: true },
+      { name: '🎒 Inventaire', value: inv.length > 200 ? inv.slice(0,200)+'...' : inv },
+      { name: '📦 Entrepot', value: stk.length > 200 ? stk.slice(0,200)+'...' : stk },
+    ).setFooter({ text: 'Astra RP • Admin Panel' }).setTimestamp()], ephemeral: true });
   }
 });
 
