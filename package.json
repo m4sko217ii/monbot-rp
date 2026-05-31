@@ -1,0 +1,17 @@
+{
+  "name": "gta5-rp-bot",
+  "version": "2.0.0",
+  "description": "Bot Discord GTA 5 RP + Site abonnement PayPal",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "@discordjs/rest": "^2.3.0",
+    "discord-api-types": "^0.37.83",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "axios": "^1.6.7"
+  }
+}
