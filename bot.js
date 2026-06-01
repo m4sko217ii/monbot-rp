@@ -78,8 +78,62 @@ function getPlayer(db, userId) {
   return db;
 }
 
+
+// ─── CONFIG SERVEUR (JSON) ───────────────────────────────────────────────────
+const CONFIG_FILE = './server_config.json';
+
+function loadConfig() {
+  if (!fs.existsSync(CONFIG_FILE)) {
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify({ guilds: {} }));
+  }
+  return JSON.parse(fs.readFileSync(CONFIG_FILE));
+}
+
+function saveConfig(cfg) {
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2));
+}
+
+function getGuildConfig(guildId) {
+  const cfg = loadConfig();
+  if (!cfg.guilds[guildId]) {
+    cfg.guilds[guildId] = { regles_channel: null, tickets_channel: null, ticket_role: null };
+    saveConfig(cfg);
+  }
+  return cfg.guilds[guildId];
+}
+
 // ─── COMMANDES SLASH ──────────────────────────────────────────────────────────
 const commands = [
+  new SlashCommandBuilder()
+    .setName('setregles')
+    .setDescription('[ADMIN] Définir le salon des règles')
+    .addChannelOption(o => o.setName('channel').setDescription('Salon des règles').setRequired(true))
+    .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
+
+  new SlashCommandBuilder()
+    .setName('settickets')
+    .setDescription('[ADMIN] Définir le salon des tickets')
+    .addChannelOption(o => o.setName('channel').setDescription('Salon des tickets').setRequired(true))
+    .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
+
+  new SlashCommandBuilder()
+    .setName('setticket_role')
+    .setDescription('[ADMIN] Définir le rôle pour les tickets support')
+    .addRoleOption(o => o.setName('role').setDescription('Rôle à mentionner').setRequired(true))
+    .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
+
+  new SlashCommandBuilder()
+    .setName('setrecrutement')
+    .setDescription('[ADMIN] Envoyer les fiches de recrutement dans #recrutement')
+    .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
+
+
+
+  new SlashCommandBuilder()
+    .setName('clearguild')
+    .setDescription('[ADMIN] Supprimer TOUS les salons du serveur (attention!)')
+    .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
+
   // SETUP
   new SlashCommandBuilder()
     .setName('setup')
@@ -287,66 +341,87 @@ client.on('interactionCreate', async interaction => {
   if (commandName === 'setup') {
     await interaction.deferReply();
     const guild = interaction.guild;
+    const cfg = getGuildConfig(guild.id);
 
+    // ÉTAPE 1: Supprimer TOUS les salons existants
+    await interaction.editReply({ content: '🗑️ Suppression des anciens salons...' });
+    const allChannels = await guild.channels.fetch();
+    for (const ch of allChannels.values()) {
+      try {
+        await ch.delete();
+      } catch (e) {
+        console.error('Erreur suppression:', e.message);
+      }
+    }
+
+    // ÉTAPE 2: Recréer les salons
+    await interaction.editReply({ content: '⚙️ Création des nouveaux salons...' });
     const categories = [
       {
-        name: '🏙️ ─ LOS SANTOS RP',
+        name: '🏙️ ─ ASTRA RP',
         channels: [
-          { name: '📋・règlement', type: ChannelType.GuildText },
+          { name: '📋・reglement', type: ChannelType.GuildText },
           { name: '📢・annonces', type: ChannelType.GuildText },
-          { name: '✅・vérification', type: ChannelType.GuildText },
-          { name: '🗺️・présentation', type: ChannelType.GuildText },
+          { name: '✅・verification', type: ChannelType.GuildText },
+          { name: '🗺️・presentation', type: ChannelType.GuildText },
         ]
       },
       {
-        name: '💬 ─ GÉNÉRAL',
+        name: '💬 ─ GENERAL',
         channels: [
-          { name: '💬・général', type: ChannelType.GuildText },
-          { name: '🖼️・médias', type: ChannelType.GuildText },
+          { name: '💬・general', type: ChannelType.GuildText },
+          { name: '🖼️・medias', type: ChannelType.GuildText },
           { name: '🎮・hors-rp', type: ChannelType.GuildText },
           { name: '🤝・recrutement', type: ChannelType.GuildText },
-          { name: '🎤・vocal-général', type: ChannelType.GuildVoice },
+          { name: '🎤・vocal-general', type: ChannelType.GuildVoice },
           { name: '🎮・gaming', type: ChannelType.GuildVoice },
+          { name: '🎵・musique', type: ChannelType.GuildVoice },
         ]
       },
       {
-        name: '🏦 ─ ÉCONOMIE & BANQUE',
+        name: '🏦 ─ ECONOMIE & BANQUE',
         channels: [
           { name: '💳・compte-bancaire', type: ChannelType.GuildText },
-          { name: '🏪・marché', type: ChannelType.GuildText },
+          { name: '🏪・marche', type: ChannelType.GuildText },
           { name: '💼・offres-emploi', type: ChannelType.GuildText },
         ]
       },
       {
         name: '🚔 ─ LSPD - POLICE',
         channels: [
-          { name: '🚔・quartier-général', type: ChannelType.GuildText },
+          { name: '🚔・quartier-general', type: ChannelType.GuildText },
           { name: '📋・rapports-police', type: ChannelType.GuildText },
           { name: '🔍・avis-recherche', type: ChannelType.GuildText },
           { name: '🎤・briefing-police', type: ChannelType.GuildVoice },
         ]
       },
       {
-        name: '⚕️ ─ EMS - MÉDECINS',
+        name: '⚕️ ─ EMS - MEDECINS',
         channels: [
           { name: '🏥・urgences', type: ChannelType.GuildText },
-          { name: '📋・rapports-médicaux', type: ChannelType.GuildText },
+          { name: '📋・rapports-medicaux', type: ChannelType.GuildText },
           { name: '🎤・ems-vocal', type: ChannelType.GuildVoice },
         ]
       },
       {
         name: '🌿 ─ CRIMINEL',
         channels: [
-          { name: '💊・marché-noir', type: ChannelType.GuildText },
-          { name: '🔫・armurerie-illégale', type: ChannelType.GuildText },
+          { name: '💊・marche-noir', type: ChannelType.GuildText },
+          { name: '🔫・armurerie-illegale', type: ChannelType.GuildText },
           { name: '🤝・deals', type: ChannelType.GuildText },
           { name: '🎤・criminel-vocal', type: ChannelType.GuildVoice },
         ]
       },
       {
+        name: '🎫 ─ SUPPORT',
+        channels: [
+          { name: '🎫・tickets', type: ChannelType.GuildText },
+        ]
+      },
+      {
         name: '📋 ─ ADMINISTRATION',
         channels: [
-          { name: '🛠️・staff-général', type: ChannelType.GuildText },
+          { name: '🛠️・staff-general', type: ChannelType.GuildText },
           { name: '📩・demandes', type: ChannelType.GuildText },
           { name: '🔨・sanctions', type: ChannelType.GuildText },
           { name: '🎤・staff-vocal', type: ChannelType.GuildVoice },
@@ -354,19 +429,70 @@ client.on('interactionCreate', async interaction => {
       },
     ];
 
+    let reglesChannel = null;
+    let ticketsChannel = null;
+
     for (const cat of categories) {
       const category = await guild.channels.create({ name: cat.name, type: ChannelType.GuildCategory });
       for (const ch of cat.channels) {
-        await guild.channels.create({ name: ch.name, type: ch.type, parent: category.id });
+        const channel = await guild.channels.create({ name: ch.name, type: ch.type, parent: category.id });
+        
+        // Sauvegarder les IDs des salons importants
+        if (ch.name === '📋・reglement') reglesChannel = channel;
+        if (ch.name === '🎫・tickets') ticketsChannel = channel;
       }
     }
 
+    // ÉTAPE 3: Ajouter les règles
+    if (reglesChannel) {
+      const reglEmbed = new EmbedBuilder()
+        .setTitle('📋 REGLEMENT — ASTRA RP')
+        .setColor(0xe8212a)
+        .setDescription('Bienvenue sur **Astra RP** ! Lisez attentivement le reglement avant de jouer.')
+        .addFields(
+          { name: '1️⃣ Respect', value: 'Respectez tous les membres. Aucune insulte, discrimination ou harcelement tolere.' },
+          { name: '2️⃣ No Meta-Gaming', value: "N'utilisez pas d'informations hors-RP dans le jeu." },
+          { name: '3️⃣ No Power-Gaming', value: "Ne forcez pas des actions impossibles sur d'autres joueurs." },
+          { name: '4️⃣ No Deathmaching', value: 'Tuer sans raison RP valable est interdit.' },
+          { name: '5️⃣ Fear RP', value: 'Votre personnage doit craindre pour sa vie dans les situations dangereuses.' },
+          { name: '6️⃣ Personnage coherent', value: 'Restez en personnage a tout moment dans les zones RP.' },
+          { name: '7️⃣ Ecoute du staff', value: 'Les decisions du staff sont definitives. Ouvrez un ticket pour contester.' },
+        )
+        .setFooter({ text: 'Astra RP • Bonne chance!' })
+        .setTimestamp();
+      const msg = await reglesChannel.send({ embeds: [reglEmbed] });
+      await msg.pin().catch(() => {});
+      
+      cfg.regles_channel = reglesChannel.id;
+    }
+
+    // ÉTAPE 4: Setup tickets
+    if (ticketsChannel) {
+      const ticketBtn = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('open_ticket').setLabel('Ouvrir un ticket').setStyle(ButtonStyle.Primary).setEmoji('🎫')
+      );
+      await ticketsChannel.send({ embeds: [new EmbedBuilder()
+        .setTitle('🎫 Support — Astra RP')
+        .setColor(0x1e90ff)
+        .setDescription("Besoin d'aide ? Cliquez sur le bouton ci-dessous pour ouvrir un ticket privé avec le staff.")
+        .setFooter({ text: 'Astra RP • Support' })], components: [ticketBtn] });
+      
+      cfg.tickets_channel = ticketsChannel.id;
+    }
+
+    saveConfig(loadConfig());
+
     const embed = new EmbedBuilder()
-      .setTitle('✅ Serveur Astra RP configuré !')
-      .setDescription('Tous les salons ont été créés avec succès.\nBienvenue sur **Astra RP** 🌌')
+      .setTitle('✅ Serveur Astra RP configure!')
       .setColor(0x00ff88)
-      .setThumbnail('https://cdn.discordapp.com/emojis/gtav.png')
-      .setFooter({ text: 'Astra RP • Setup complet' });
+      .setDescription('Tous les salons ont ete crees avec succes !')
+      .addFields(
+        { name: '📋 Reglement', value: 'Ecrit et epingle automatiquement', inline: true },
+        { name: '🎫 Tickets', value: 'Bouton configure dans #tickets', inline: true },
+        { name: '✨ Prêt!', value: 'Ton serveur est operationnel', inline: true },
+      )
+      .setFooter({ text: 'Astra RP • Setup complet' })
+      .setTimestamp();
 
     await interaction.editReply({ embeds: [embed] });
   }
@@ -1135,6 +1261,55 @@ client.on('interactionCreate', async interaction => {
       .setTimestamp();
     await interaction.reply({ embeds: [embed], ephemeral: true });
   }
+
+  // ══════════════════════════════════════════
+  //  RECRUTEMENT
+  // ══════════════════════════════════════════
+  else if (commandName === 'setrecrutement') {
+    await interaction.deferReply();
+    const guild = interaction.guild;
+    
+    // Trouver le salon #recrutement
+    const recrutChannel = guild.channels.cache.find(c => c.name === '🤝・recrutement');
+    if (!recrutChannel) {
+      return interaction.editReply({ content: "❌ Salon #recrutement introuvable ! Lance `/setup` d'abord." });
+    }
+
+    // Envoyer chaque fiche métier
+    let count = 0;
+    for (const [job, data] of Object.entries(FICHES_RECRUTEMENT)) {
+      const embed = new EmbedBuilder()
+        .setTitle(`${data.emoji} ${job}`)
+        .setColor(0xf5c518)
+        .setDescription(data.description)
+        .addFields(
+          { name: '💰 Salaire', value: `${data.salaire.toLocaleString()}€ par versement`, inline: true },
+          { name: '⭐ XP', value: `+${data.xp} XP par versement`, inline: true },
+          { name: '⏱️ Versement', value: 'Toutes les 4 heures', inline: true }
+        )
+        .setFooter({ text: 'Astra RP • Recrutement' })
+        .setTimestamp();
+      
+      try {
+        await recrutChannel.send({ embeds: [embed] });
+        count++;
+        // Petit délai pour éviter le rate limit
+        await new Promise(r => setTimeout(r, 500));
+      } catch (e) {
+        console.error(`Erreur envoi fiche ${job}:`, e.message);
+      }
+    }
+
+    await interaction.editReply({ 
+      embeds: [new EmbedBuilder()
+        .setTitle('✅ Fiches de recrutement envoyées!')
+        .setColor(0x00ff88)
+        .setDescription(`**${count} fiches métiers** ont été envoyées dans #recrutement !`)
+        .setFooter({ text: 'Astra RP • Recrutement complet' })
+        .setTimestamp()] 
+    });
+  }
+
 
   // ══════════════════════════════════════════
   //  HELP
