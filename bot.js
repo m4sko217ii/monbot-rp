@@ -21,12 +21,13 @@ const SITE_URL  = process.env.SITE_URL  || 'http://localhost:3000';
 // Commandes qui NE nécessitent PAS d'abonnement
 const FREE_COMMANDS = ['setup'];
 
-async function checkSubscription(userId) {
+async function checkSubscription(guildId) {
   try {
-    const res = await axios.get(`${SITE_URL}/api/check/${userId}`);
+    const res = await axios.get(`${SITE_URL}/api/check-guild/${guildId}`, { timeout: 5000 });
     return res.data;
   } catch {
-    return { access: false, reason: 'Erreur de connexion au serveur' };
+    // Si le site est injoignable, on laisse passer pour pas bloquer le bot
+    return { access: true, daysLeft: 999, reason: 'Site injoignable - acces autorise par defaut' };
   }
 }
 
