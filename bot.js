@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ChannelType, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ChannelType, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ActivityType } = require('discord.js');
 const { REST } = require('@discordjs/rest');
 const { Routes } = require('discord-api-types/v10');
 const fs = require('fs');
@@ -18,7 +18,11 @@ const CLIENT_ID = process.env.CLIENT_ID || 'TON_CLIENT_ID_ICI';
 const SITE_URL  = process.env.SITE_URL  || 'http://localhost:3000';
 
 // ─── VÉRIFICATION ABONNEMENT ─────────────────────────────────────────────────
-const FREE_COMMANDS = ['setup'];
+// Toutes les commandes sont libres par défaut — restreins uniquement celles que tu veux
+const FREE_COMMANDS = [
+  'setup', 'profil', 'solde', 'help', 'metiers',
+  'arrest', 'release', 'prison', 'detenus', 'ticket', 'status',
+];
 
 async function checkSubscription(guildId) {
   try {
@@ -668,7 +672,7 @@ function getServerStructure() {
         { name: '🎮 ﹒ 𝗥𝗼𝗹𝗲𝗽𝗹𝗮𝘆 𝗚é𝗻é𝗿𝗮𝗹', type: ChannelType.GuildVoice },
         { name: '👮 ﹒ 𝗤𝘂𝗮𝗿𝘁𝗶𝗲𝗿 𝗣𝗼𝗹𝗶𝗰𝗲', type: ChannelType.GuildVoice },
         { name: '🏥 ﹒ 𝗛ô𝗽𝗶𝘁𝗮𝗹 𝗖𝗲𝗻𝘁𝗿𝗮𝗹', type: ChannelType.GuildVoice },
-        { name: '🔧 ﹒ 𝗚𝗮𝗿𝗮𝗴𝗲 𝗠é𝗰𝗮𝗻𝗶𝗾𝘂𝗲', type: ChannelType.GuildVoice },
+        { name: '🔧 ﹒ 𝗚𝗮𝗿𝗮𝗴𝗲 𝗠é𝗰𝗮𝗻𝗶𝗾𝘀𝗲', type: ChannelType.GuildVoice },
         { name: '⚖️ ﹒ 𝗧𝗿𝗶𝗯𝘂𝗻𝗮𝗹', type: ChannelType.GuildVoice },
         { name: '🏙️ ﹒ 𝗩𝗶𝗹𝗹𝗲 𝗛𝗮𝘂𝘁𝗲', type: ChannelType.GuildVoice },
         { name: '🌆 ﹒ 𝗭𝗼𝗻𝗲 𝗜𝗻𝗱𝘂𝘀𝘁𝗿𝗶𝗲𝗹𝗹𝗲', type: ChannelType.GuildVoice },
@@ -760,102 +764,101 @@ function getServerStructure() {
 
 // ─── FONCTION SETUP PRINCIPAL ────────────────────────────────────────────────
 async function runSetup(guild, interaction = null) {
-  // Canal depuis lequel la commande a été lancée — on le garde en dernier
   const originChannelId = interaction?.channelId || null;
+  const originUserId    = interaction?.user?.id   || null;
 
-  const reply = async (msg) => {
-    if (interaction) {
-      try { await interaction.editReply(msg); } catch {}
-    }
+  const dmUser = async (msg) => {
+    if (!originUserId) return;
+    try {
+      const u = await guild.client.users.fetch(originUserId);
+      await u.send(msg);
+    } catch {}
   };
 
-  await reply('⏳ **Étape 1/4** — Suppression des anciens salons...');
+  try {
+    await dmUser('⏳ **[1/4]** Suppression des anciens salons...');
 
-  // 1. Supprimer tous les salons existants SAUF le salon d'origine
-  //    (pour que Discord puisse encore recevoir les editReply)
-  const channels = [...guild.channels.cache.values()];
-  for (const ch of channels) {
-    if (ch.id === originChannelId) continue; // on le garde pour l'instant
-    try { await ch.delete(); } catch {}
-  }
-
-  await reply('⏳ **Étape 2/4** — Création des catégories et salons...');
-
-  const structure = getServerStructure();
-  const createdChannels = {};
-
-  // 2. Créer toutes les catégories et leurs salons
-  for (const cat of structure) {
-    let category;
-    try {
-      category = await guild.channels.create({
-        name: cat.name,
-        type: ChannelType.GuildCategory,
-      });
-    } catch (e) {
-      console.error('Erreur création catégorie:', e.message);
-      continue;
+    // 1. Supprimer tous les salons sauf le salon d'origine
+    const channels = [...guild.channels.cache.values()];
+    for (const ch of channels) {
+      if (ch.id === originChannelId) continue;
+      try { await ch.delete(); await sleep(200); } catch {}
     }
 
-    for (const ch of cat.channels) {
+    await dmUser('⏳ **[2/4]** Création des catégories et salons...');
+
+    const structure = getServerStructure();
+    const createdChannels = {};
+
+    // 2. Créer toutes les catégories et leurs salons
+    for (const cat of structure) {
+      let category;
       try {
-        const created = await guild.channels.create({
-          name: ch.name,
-          type: ch.type,
-          parent: category.id,
-          topic: ch.topic || null,
+        category = await guild.channels.create({
+          name: cat.name,
+          type: ChannelType.GuildCategory,
         });
-        createdChannels[ch.name] = created;
       } catch (e) {
-        console.error('Erreur création salon:', ch.name, e.message);
+        console.error('Erreur création catégorie:', e.message);
+        continue;
       }
-      await sleep(300);
-    }
-    await sleep(500);
-  }
 
-  await reply('⏳ **Étape 3/4** — Publication des explications et règles...');
-
-  // 3. Poster les explications dans chaque salon texte
-  for (const cat of structure) {
-    for (const ch of cat.channels) {
-      const created = createdChannels[ch.name];
-      if (!created || ch.type !== ChannelType.GuildText) continue;
-
-      if (ch.isRecruitment && ch.metier) {
-        // Poster le message de recrutement du métier
-        await postRecruitmentEmbed(created, ch.metier);
-      } else if (ch.explanation) {
-        // Poster l'explication du salon
-        await postExplanationEmbed(created, ch.explanation);
+      for (const ch of cat.channels) {
+        try {
+          const created = await guild.channels.create({
+            name: ch.name,
+            type: ch.type,
+            parent: category.id,
+            topic: ch.topic || null,
+          });
+          createdChannels[ch.name] = created;
+        } catch (e) {
+          console.error('Erreur création salon:', ch.name, e.message);
+        }
+        await sleep(300);
       }
-      await sleep(400);
+      await sleep(500);
     }
-  }
 
-  await reply('⏳ **Étape 4/4** — Création du message de règlement...');
+    await dmUser('⏳ **[3/4]** Publication des explications et règles...');
 
-  // 4. Poster le règlement complet
-  const reglementChannel = Object.values(createdChannels).find(c => c.name === '📌・règlement');
-  if (reglementChannel) {
-    await postReglementComplet(reglementChannel);
-  }
+    // 3. Poster les explications dans chaque salon texte
+    for (const cat of structure) {
+      for (const ch of cat.channels) {
+        const created = createdChannels[ch.name];
+        if (!created || ch.type !== ChannelType.GuildText) continue;
 
-  await reply('✅ **Setup terminé !** Le serveur a été entièrement recréé.');
+        if (ch.isRecruitment && ch.metier) {
+          await postRecruitmentEmbed(created, ch.metier);
+        } else if (ch.explanation) {
+          await postExplanationEmbed(created, ch.explanation);
+        }
+        await sleep(400);
+      }
+    }
 
-  // Supprimer le salon d'origine maintenant que tout est fait
-  if (originChannelId) {
-    try {
-      const originCh = guild.channels.cache.get(originChannelId);
-      if (originCh) await originCh.delete();
-    } catch {}
-  }
+    await dmUser('⏳ **[4/4]** Création du règlement complet...');
 
-  // Envoyer un DM à l'admin pour confirmer la fin du setup
-  if (interaction?.user) {
-    try {
-      await interaction.user.send('✅ **Setup Astra RP terminé !** Le serveur a été entièrement recréé avec succès.');
-    } catch {}
+    // 4. Poster le règlement complet
+    const reglementChannel = Object.values(createdChannels).find(c => c.name === '📌・règlement');
+    if (reglementChannel) {
+      await postReglementComplet(reglementChannel);
+    }
+
+    // 5. Supprimer le salon d'origine
+    await sleep(2000);
+    if (originChannelId) {
+      try {
+        const originChan = guild.channels.cache.get(originChannelId);
+        if (originChan) await originChan.delete();
+      } catch {}
+    }
+
+    await dmUser('✅ **Setup Astra RP terminé !** Le serveur a été entièrement recréé avec succès. 🎉');
+
+  } catch (e) {
+    console.error('Erreur runSetup:', e.message);
+    await dmUser(`❌ **Erreur durant le setup :** ${e.message}\nCertains salons ont peut-être été créés. Relance \`/setup\` si nécessaire.`);
   }
 }
 
@@ -937,7 +940,6 @@ async function postRecruitmentEmbed(channel, metier) {
 
 async function postReglementComplet(channel) {
   try {
-    // Message d'accueil
     const welcomeEmbed = new EmbedBuilder()
       .setTitle('⚖️ Règlement Officiel — Astra RP')
       .setDescription('> Bienvenue sur **Astra RP** ! Ce règlement est obligatoire. Son non-respect entraîne des sanctions.\n> En rejoignant le serveur, vous acceptez automatiquement ce règlement.')
@@ -947,7 +949,6 @@ async function postReglementComplet(channel) {
     await channel.send({ embeds: [welcomeEmbed] });
     await sleep(500);
 
-    // Règles générales
     const generalEmbed = new EmbedBuilder()
       .setTitle('📋 Règles Générales')
       .setColor(0x5865F2)
@@ -962,7 +963,6 @@ async function postReglementComplet(channel) {
     await channel.send({ embeds: [generalEmbed] });
     await sleep(500);
 
-    // Règles RP
     const rpEmbed = new EmbedBuilder()
       .setTitle('🎭 Règles de Roleplay')
       .setColor(0x57F287)
@@ -978,7 +978,6 @@ async function postReglementComplet(channel) {
     await channel.send({ embeds: [rpEmbed] });
     await sleep(500);
 
-    // Règles métiers
     const jobsEmbed = new EmbedBuilder()
       .setTitle('💼 Règles des Métiers')
       .setColor(0xEB459E)
@@ -992,7 +991,6 @@ async function postReglementComplet(channel) {
     await channel.send({ embeds: [jobsEmbed] });
     await sleep(500);
 
-    // Sanctions
     const sanctionsEmbed = new EmbedBuilder()
       .setTitle('🔨 Système de Sanctions')
       .setColor(0xED4245)
@@ -1023,7 +1021,6 @@ async function imprisonPlayer(guild, userId, dureeMinutes, raison, officierTag) 
   db.players[userId].imprisoned = { active: true, until, reason: raison, by: officierTag };
   saveDB(db);
 
-  // Ajouter le rôle Emprisonné
   try {
     let role = guild.roles.cache.find(r => r.name === PRISON_ROLE_NAME);
     if (!role) {
@@ -1037,7 +1034,6 @@ async function imprisonPlayer(guild, userId, dureeMinutes, raison, officierTag) 
     if (member) await member.roles.add(role);
   } catch {}
 
-  // Poster dans le salon prison
   const prisonChan = guild.channels.cache.find(c => c.name === '🔒・prison');
   if (prisonChan) {
     const embed = new EmbedBuilder()
@@ -1055,10 +1051,8 @@ async function imprisonPlayer(guild, userId, dureeMinutes, raison, officierTag) 
     await prisonChan.send({ embeds: [embed] });
   }
 
-  // Annuler un timer existant si le joueur était déjà en prison
   if (prisonTimers[userId]) clearTimeout(prisonTimers[userId]);
 
-  // Timer de libération automatique
   prisonTimers[userId] = setTimeout(async () => {
     await releasePlayer(guild, userId, 'Peine purgée automatiquement');
   }, dureeMinutes * 60000);
@@ -1071,20 +1065,17 @@ async function releasePlayer(guild, userId, raison = 'Libéré par un officier')
   db.players[userId].imprisoned = { active: false, until: 0, reason: null, by: null };
   saveDB(db);
 
-  // Retirer le rôle Emprisonné
   try {
     const role = guild.roles.cache.find(r => r.name === PRISON_ROLE_NAME);
     const member = await guild.members.fetch(userId).catch(() => null);
     if (member && role) await member.roles.remove(role);
   } catch {}
 
-  // Annuler le timer si libéré manuellement
   if (prisonTimers[userId]) {
     clearTimeout(prisonTimers[userId]);
     delete prisonTimers[userId];
   }
 
-  // Poster dans le salon prison
   const prisonChan = guild.channels.cache.find(c => c.name === '🔒・prison');
   if (prisonChan) {
     const embed = new EmbedBuilder()
@@ -1100,7 +1091,6 @@ async function releasePlayer(guild, userId, raison = 'Libéré par un officier')
   }
 }
 
-// Relancer les timers de prison au démarrage du bot
 function restorePrisonTimers(guild) {
   const db = loadDB();
   const now = Date.now();
@@ -1193,11 +1183,30 @@ const commands = [
           { name: '⚖️ Contester une sanction', value: 'sanction' },
           { name: '📋 Autre', value: 'autre' },
         )),
+
+  new SlashCommandBuilder()
+    .setName('status')
+    .setDescription('🤖 Changer le statut d\'activité du bot. Admin uniquement.')
+    .addStringOption(opt => opt.setName('texte').setDescription('Le texte du statut').setRequired(true))
+    .addStringOption(opt =>
+      opt.setName('type')
+        .setDescription('Type d\'activité')
+        .setRequired(false)
+        .addChoices(
+          { name: 'Joue à', value: 'PLAYING' },
+          { name: 'Regarde', value: 'WATCHING' },
+          { name: 'Écoute', value: 'LISTENING' },
+          { name: 'En compétition', value: 'COMPETING' },
+        ))
+    .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
+
 ].map(c => c.toJSON());
 
 // ─── ENREGISTREMENT DES COMMANDES ────────────────────────────────────────────
 client.once('ready', async () => {
   console.log(`✅ Bot connecté : ${client.user.tag}`);
+
+  client.user.setActivity('Astra RP • /help', { type: ActivityType.Playing });
 
   try {
     const rest = new REST({ version: '10' }).setToken(TOKEN);
@@ -1207,35 +1216,102 @@ client.once('ready', async () => {
     console.error('❌ Erreur enregistrement commandes:', e.message);
   }
 
-  // Rétablir les timers de prison après un redémarrage du bot
   for (const guild of client.guilds.cache.values()) {
     try { restorePrisonTimers(guild); } catch {}
   }
   console.log('✅ Timers de prison rétablis.');
 });
 
-// ─── GESTION DES COMMANDES SLASH ─────────────────────────────────────────────
+// ─── GESTION DES INTERACTIONS (SLASH + BOUTONS) ───────────────────────────────
 client.on('interactionCreate', async interaction => {
+
+  // ─── BOUTONS TICKET ───────────────────────────────────────────────────────
+  if (interaction.isButton()) {
+    const { guild } = interaction;
+
+    if (interaction.customId.startsWith('ticket_close_')) {
+      const ownerId = interaction.customId.replace('ticket_close_', '');
+      const isStaff = interaction.member.permissions.has(PermissionsBitField.Flags.KickMembers);
+
+      if (interaction.user.id !== ownerId && !isStaff) {
+        return interaction.reply({ content: '❌ Seul le créateur du ticket ou le staff peut le fermer.', ephemeral: true });
+      }
+
+      const confirmBtn = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`ticket_confirm_close_${ownerId}`)
+          .setLabel('✅ Confirmer la fermeture')
+          .setStyle(ButtonStyle.Danger),
+        new ButtonBuilder()
+          .setCustomId('ticket_cancel_close')
+          .setLabel('❌ Annuler')
+          .setStyle(ButtonStyle.Secondary),
+      );
+
+      return interaction.reply({
+        content: '⚠️ Es-tu sûr de vouloir fermer ce ticket ?',
+        components: [confirmBtn],
+        ephemeral: true,
+      });
+    }
+
+    if (interaction.customId.startsWith('ticket_confirm_close_')) {
+      await logModeration(guild, new EmbedBuilder()
+        .setTitle('🔒 Ticket Fermé')
+        .setColor(0xED4245)
+        .addFields(
+          { name: '📌 Salon', value: interaction.channel.name, inline: true },
+          { name: '🔒 Fermé par', value: interaction.user.tag, inline: true },
+        )
+        .setTimestamp());
+
+      await interaction.reply({ content: '🔒 Ticket fermé. Suppression dans 5 secondes...' });
+      setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
+      return;
+    }
+
+    if (interaction.customId === 'ticket_cancel_close') {
+      return interaction.reply({ content: '✅ Fermeture annulée.', ephemeral: true });
+    }
+
+    return;
+  }
+
+  // ─── COMMANDES SLASH UNIQUEMENT ───────────────────────────────────────────
   if (!interaction.isChatInputCommand()) return;
 
   const { commandName, guild, member } = interaction;
+
+  // Commandes qui doivent rester éphémères (visibles seulement par l'utilisateur)
+  const EPHEMERAL_COMMANDS = ['solde', 'help', 'detenus', 'prison'];
+  const isEphemeral = EPHEMERAL_COMMANDS.includes(commandName);
+
+  // defer IMMÉDIATEMENT — évite le timeout Discord de 3 secondes
+  try {
+    await interaction.deferReply({ ephemeral: isEphemeral });
+  } catch {
+    return;
+  }
 
   // Vérification abonnement (sauf commandes gratuites)
   if (!FREE_COMMANDS.includes(commandName)) {
     const sub = await checkSubscription(guild.id);
     if (!sub.access) {
-      return interaction.reply({ embeds: [noSubEmbed(sub.daysLeft)], ephemeral: true });
+      return interaction.editReply({ embeds: [noSubEmbed(sub.daysLeft)] });
     }
   }
 
   // ─── /setup ───────────────────────────────────────────────────────────────
   if (commandName === 'setup') {
     if (!member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-      return interaction.reply({ content: '❌ Vous devez être administrateur pour utiliser cette commande.', ephemeral: true });
+      return interaction.editReply({ content: '❌ Vous devez être administrateur pour utiliser cette commande.' });
     }
 
-    await interaction.reply({ content: '⚙️ **Setup en cours...** Cela peut prendre 1 à 2 minutes.', ephemeral: false });
-    await runSetup(guild, interaction);
+    // Répondre immédiatement pour éviter le timeout Discord (3s)
+    await interaction.editReply({ content: '⚙️ **Setup lancé !** Tu vas recevoir un DM avec la progression. Cela peut prendre 1 à 2 minutes...' });
+
+    // Lancer le setup en arrière-plan (sans await ici pour ne pas bloquer)
+    runSetup(guild, interaction).catch(e => console.error('Erreur runSetup:', e.message));
     return;
   }
 
@@ -1248,7 +1324,7 @@ client.on('interactionCreate', async interaction => {
     const b = db.bank[target.id];
 
     if (!p.created) {
-      return interaction.reply({ content: '❌ Ce joueur n\'a pas encore créé son personnage. Utilisez `+create` pour commencer !', ephemeral: true });
+      return interaction.editReply({ content: '❌ Ce joueur n\'a pas encore créé son personnage. Utilisez `+create` pour commencer !' });
     }
 
     const metier = METIERS.find(m => m.id === p.job) || null;
@@ -1268,7 +1344,7 @@ client.on('interactionCreate', async interaction => {
       .setTimestamp()
       .setFooter({ text: `Astra RP • Fiche de ${p.prenom} ${p.nom}` });
 
-    return interaction.reply({ embeds: [embed] });
+    return interaction.editReply({ embeds: [embed] });
   }
 
   // ─── /solde ───────────────────────────────────────────────────────────────
@@ -1288,7 +1364,7 @@ client.on('interactionCreate', async interaction => {
       .setFooter({ text: 'Astra RP • Économie' })
       .setTimestamp();
 
-    return interaction.reply({ embeds: [embed], ephemeral: true });
+    return interaction.editReply({ embeds: [embed] });
   }
 
   // ─── /help ────────────────────────────────────────────────────────────────
@@ -1302,12 +1378,12 @@ client.on('interactionCreate', async interaction => {
         { name: '💰 Économie', value: '`+pay @joueur [montant]` — Payer un joueur\n`+depot [montant]` — Déposer en banque\n`+retrait [montant]` — Retirer de la banque\n`+salaire` — Collecter son salaire' },
         { name: '🏠 Logement & Véhicules', value: '`+maison` — Voir son logement\n`+garage` — Voir ses véhicules\n`+permis` — Voir son permis' },
         { name: '⚙️ Admin (+set)', value: '`+set salaire [métier] [montant]` — Changer un salaire\n`+set agemin [métier] [âge]` — Changer l\'âge min\n`+set startcash [montant]` — Argent de départ\n`+set prefix [préfixe]` — Changer le préfixe' },
-        { name: '🔧 Setup', value: '`/setup` — Recréer tout le serveur *(Admin)*' },
+        { name: '🔧 Setup & Admin', value: '`/setup` — Recréer tout le serveur *(Admin)*\n`/status [texte]` — Changer le statut du bot *(Admin)*' },
       )
       .setFooter({ text: 'Astra RP • Aide' })
       .setTimestamp();
 
-    return interaction.reply({ embeds: [embed], ephemeral: true });
+    return interaction.editReply({ embeds: [embed] });
   }
 
   // ─── /metiers ─────────────────────────────────────────────────────────────
@@ -1331,17 +1407,17 @@ client.on('interactionCreate', async interaction => {
       .setFooter({ text: 'Astra RP • Consultez les salons de recrutement pour postuler' })
       .setTimestamp();
 
-    return interaction.reply({ embeds: [embed] });
+    return interaction.editReply({ embeds: [embed] });
   }
 
   // ─── /arrest ──────────────────────────────────────────────────────────────
   if (commandName === 'arrest') {
-    const target   = interaction.options.getUser('joueur');
-    const duree    = interaction.options.getInteger('duree');
-    const raison   = interaction.options.getString('raison');
+    const target = interaction.options.getUser('joueur');
+    const duree  = interaction.options.getInteger('duree');
+    const raison = interaction.options.getString('raison');
 
     if (target.id === interaction.user.id) {
-      return interaction.reply({ content: '❌ Tu ne peux pas t\'arrêter toi-même.', ephemeral: true });
+      return interaction.editReply({ content: '❌ Tu ne peux pas t\'arrêter toi-même.' });
     }
 
     const db2 = loadDB();
@@ -1349,7 +1425,7 @@ client.on('interactionCreate', async interaction => {
 
     if (isImprisoned(db2, target.id)) {
       const until = db2.players[target.id].imprisoned.until;
-      return interaction.reply({ content: `❌ Ce joueur est déjà en prison. Libération prévue <t:${Math.floor(until / 1000)}:R>.`, ephemeral: true });
+      return interaction.editReply({ content: `❌ Ce joueur est déjà en prison. Libération prévue <t:${Math.floor(until / 1000)}:R>.` });
     }
 
     await imprisonPlayer(guild, target.id, duree, raison, interaction.user.tag);
@@ -1365,7 +1441,7 @@ client.on('interactionCreate', async interaction => {
       )
       .setTimestamp());
 
-    return interaction.reply({
+    return interaction.editReply({
       embeds: [new EmbedBuilder()
         .setTitle('🚔 Arrestation effectuée')
         .setColor(0xED4245)
@@ -1388,7 +1464,7 @@ client.on('interactionCreate', async interaction => {
     getPlayer(db2, target.id);
 
     if (!isImprisoned(db2, target.id)) {
-      return interaction.reply({ content: '❌ Ce joueur n\'est pas en prison.', ephemeral: true });
+      return interaction.editReply({ content: '❌ Ce joueur n\'est pas en prison.' });
     }
 
     await releasePlayer(guild, target.id, raison);
@@ -1403,7 +1479,7 @@ client.on('interactionCreate', async interaction => {
       )
       .setTimestamp());
 
-    return interaction.reply({
+    return interaction.editReply({
       embeds: [new EmbedBuilder()
         .setTitle('🔓 Libération effectuée')
         .setColor(0x57F287)
@@ -1423,29 +1499,30 @@ client.on('interactionCreate', async interaction => {
     const imp = p.imprisoned;
 
     if (!imp?.active || Date.now() > imp.until) {
-      const embed = new EmbedBuilder()
-        .setTitle(`🔓 Statut Prison — ${target.username}`)
-        .setColor(0x57F287)
-        .setDescription('✅ Ce joueur est **libre**. Aucune incarcération active.')
-        .setThumbnail(target.displayAvatarURL())
-        .setFooter({ text: 'Astra RP • Système Carcéral' });
-      return interaction.reply({ embeds: [embed], ephemeral: target.id === interaction.user.id });
+      return interaction.editReply({
+        embeds: [new EmbedBuilder()
+          .setTitle(`🔓 Statut Prison — ${target.username}`)
+          .setColor(0x57F287)
+          .setDescription('✅ Ce joueur est **libre**. Aucune incarcération active.')
+          .setThumbnail(target.displayAvatarURL())
+          .setFooter({ text: 'Astra RP • Système Carcéral' })],
+      });
     }
 
-    const embed = new EmbedBuilder()
-      .setTitle(`🔒 Statut Prison — ${target.username}`)
-      .setColor(0xED4245)
-      .setDescription('🔒 Ce joueur est actuellement **incarcéré**.')
-      .addFields(
-        { name: '📋 Motif', value: imp.reason || 'Non précisé', inline: false },
-        { name: '👮 Arrêté par', value: imp.by || 'Inconnu', inline: true },
-        { name: '🕐 Libération prévue', value: `<t:${Math.floor(imp.until / 1000)}:R>`, inline: true },
-      )
-      .setThumbnail(target.displayAvatarURL())
-      .setTimestamp()
-      .setFooter({ text: 'Astra RP • Système Carcéral' });
-
-    return interaction.reply({ embeds: [embed] });
+    return interaction.editReply({
+      embeds: [new EmbedBuilder()
+        .setTitle(`🔒 Statut Prison — ${target.username}`)
+        .setColor(0xED4245)
+        .setDescription('🔒 Ce joueur est actuellement **incarcéré**.')
+        .addFields(
+          { name: '📋 Motif', value: imp.reason || 'Non précisé', inline: false },
+          { name: '👮 Arrêté par', value: imp.by || 'Inconnu', inline: true },
+          { name: '🕐 Libération prévue', value: `<t:${Math.floor(imp.until / 1000)}:R>`, inline: true },
+        )
+        .setThumbnail(target.displayAvatarURL())
+        .setTimestamp()
+        .setFooter({ text: 'Astra RP • Système Carcéral' })],
+    });
   }
 
   // ─── /detenus ─────────────────────────────────────────────────────────────
@@ -1457,13 +1534,12 @@ client.on('interactionCreate', async interaction => {
       .map(([id, p]) => ({ id, ...p.imprisoned }));
 
     if (detenus.length === 0) {
-      return interaction.reply({
+      return interaction.editReply({
         embeds: [new EmbedBuilder()
           .setTitle('📋 Liste des Détenus')
           .setColor(0x57F287)
           .setDescription('✅ Aucun détenu actuellement. Les cellules sont vides !')
           .setFooter({ text: 'Astra RP • Système Carcéral' })],
-        ephemeral: true,
       });
     }
 
@@ -1471,14 +1547,13 @@ client.on('interactionCreate', async interaction => {
       `**${i + 1}.** <@${d.id}> — ${d.reason || 'N/A'} | Libération : <t:${Math.floor(d.until / 1000)}:R>`
     ).join('\n');
 
-    return interaction.reply({
+    return interaction.editReply({
       embeds: [new EmbedBuilder()
         .setTitle(`🔒 Détenus actuels — ${detenus.length} incarcéré(s)`)
         .setColor(0xED4245)
         .setDescription(lignes)
         .setTimestamp()
         .setFooter({ text: 'Astra RP • Système Carcéral' })],
-      ephemeral: true,
     });
   }
 
@@ -1495,29 +1570,24 @@ client.on('interactionCreate', async interaction => {
       autre:       '📋 Autre',
     };
 
-    // Vérifier si l'utilisateur a déjà un ticket ouvert
     const existant = guild.channels.cache.find(c =>
       c.name === `ticket-${interaction.user.username.toLowerCase().replace(/[^a-z0-9]/g, '')}` ||
       c.topic?.includes(`ticket:${interaction.user.id}`)
     );
     if (existant) {
-      return interaction.reply({
+      return interaction.editReply({
         content: `❌ Tu as déjà un ticket ouvert : ${existant}. Ferme-le avant d'en ouvrir un nouveau.`,
-        ephemeral: true,
       });
     }
 
-    // Trouver la catégorie tickets
     const ticketCat = guild.channels.cache.find(c =>
       c.type === ChannelType.GuildCategory && c.name.includes('TICKETS')
     );
 
-    // Trouver le rôle staff (Admin ou rôle nommé Staff/Modérateur)
     const staffRole = guild.roles.cache.find(r =>
       ['staff', 'modérateur', 'moderateur', 'admin'].includes(r.name.toLowerCase())
     );
 
-    // Créer le salon privé
     const ticketChannel = await guild.channels.create({
       name: `🎫・ticket-${interaction.user.username.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20)}`,
       type: ChannelType.GuildText,
@@ -1550,13 +1620,13 @@ client.on('interactionCreate', async interaction => {
           allow: [
             PermissionsBitField.Flags.ViewChannel,
             PermissionsBitField.Flags.SendMessages,
-            PermissionsBitField.Flags.ManageChannels,
+            PermissionsBitField.Flags.ReadMessageHistory,
+            PermissionsBitField.Flags.ManageMessages,
           ],
         },
       ],
     });
 
-    // Bouton de fermeture
     const closeBtn = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`ticket_close_${interaction.user.id}`)
@@ -1588,58 +1658,44 @@ client.on('interactionCreate', async interaction => {
       )
       .setTimestamp());
 
-    return interaction.reply({
+    return interaction.editReply({
       content: `✅ Ton ticket a été ouvert : ${ticketChannel}`,
-      ephemeral: true,
     });
   }
 
-  // ─── BOUTON FERMETURE TICKET ──────────────────────────────────────────────
-  if (interaction.isButton() && interaction.customId.startsWith('ticket_close_')) {
-    const ownerId = interaction.customId.replace('ticket_close_', '');
-    const isStaff = interaction.member.permissions.has(PermissionsBitField.Flags.KickMembers);
-
-    if (interaction.user.id !== ownerId && !isStaff) {
-      return interaction.reply({ content: '❌ Seul le créateur du ticket ou le staff peut le fermer.', ephemeral: true });
+  // ─── /status ──────────────────────────────────────────────────────────────
+  if (commandName === 'status') {
+    if (!member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+      return interaction.editReply({ content: '❌ Vous devez être administrateur pour utiliser cette commande.' });
     }
 
-    const confirmBtn = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`ticket_confirm_close_${ownerId}`)
-        .setLabel('✅ Confirmer la fermeture')
-        .setStyle(ButtonStyle.Danger),
-      new ButtonBuilder()
-        .setCustomId('ticket_cancel_close')
-        .setLabel('❌ Annuler')
-        .setStyle(ButtonStyle.Secondary),
-    );
+    const texte = interaction.options.getString('texte');
+    const type  = interaction.options.getString('type') || 'PLAYING';
 
-    return interaction.reply({
-      content: '⚠️ Es-tu sûr de vouloir fermer ce ticket ?',
-      components: [confirmBtn],
-      ephemeral: true,
+    const activityTypeMap = {
+      PLAYING:    ActivityType.Playing,
+      WATCHING:   ActivityType.Watching,
+      LISTENING:  ActivityType.Listening,
+      COMPETING:  ActivityType.Competing,
+    };
+
+    const activityLabels = {
+      PLAYING:   'Joue à',
+      WATCHING:  'Regarde',
+      LISTENING: 'Écoute',
+      COMPETING: 'En compétition dans',
+    };
+
+    client.user.setActivity(texte, { type: activityTypeMap[type] });
+
+    return interaction.editReply({
+      embeds: [new EmbedBuilder()
+        .setTitle('✅ Statut mis à jour')
+        .setColor(0x57F287)
+        .setDescription(`Le bot affiche maintenant : **${activityLabels[type]} ${texte}**`)
+        .setFooter({ text: 'Astra RP • Administration' })
+        .setTimestamp()],
     });
-  }
-
-  if (interaction.isButton() && interaction.customId.startsWith('ticket_confirm_close_')) {
-    const ownerId = interaction.customId.replace('ticket_confirm_close_', '');
-
-    await logModeration(guild, new EmbedBuilder()
-      .setTitle('🔒 Ticket Fermé')
-      .setColor(0xED4245)
-      .addFields(
-        { name: '📌 Salon', value: interaction.channel.name, inline: true },
-        { name: '🔒 Fermé par', value: interaction.user.tag, inline: true },
-      )
-      .setTimestamp());
-
-    await interaction.reply({ content: '🔒 Ticket fermé. Suppression dans 5 secondes...' });
-    setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
-    return;
-  }
-
-  if (interaction.isButton() && interaction.customId === 'ticket_cancel_close') {
-    return interaction.reply({ content: '✅ Fermeture annulée.', ephemeral: true });
   }
 });
 
@@ -1821,6 +1877,94 @@ client.on('messageCreate', async message => {
     return message.reply(`✅ **${montant}€** retirés. Liquide : **${db.bank[author.id].cash}€**`);
   }
 
+  // ─── +virement ────────────────────────────────────────────────────────────
+  if (cmd === 'virement') {
+    const target = message.mentions.users.first();
+    const montant = parseInt(args[1]);
+
+    if (!target || isNaN(montant) || montant <= 0) {
+      return message.reply('❌ Usage : `+virement @joueur [montant]`');
+    }
+    if (target.id === author.id) return message.reply('❌ Tu ne peux pas te virer de l\'argent à toi-même.');
+
+    getPlayer(db, target.id);
+
+    if (db.bank[author.id].bank < montant) {
+      return message.reply('❌ Pas assez d\'argent en banque !');
+    }
+
+    db.bank[author.id].bank -= montant;
+    db.bank[target.id].bank += montant;
+    saveDB(db);
+
+    const embed = new EmbedBuilder()
+      .setTitle('🏦 Virement effectué')
+      .setColor(0x57F287)
+      .addFields(
+        { name: '💸 Montant', value: `**${montant}€**`, inline: true },
+        { name: '📤 Expéditeur', value: author.username, inline: true },
+        { name: '📥 Destinataire', value: target.username, inline: true },
+        { name: '🏦 Ton solde banque', value: `${db.bank[author.id].bank}€`, inline: true },
+      )
+      .setFooter({ text: 'Astra RP • Banque' });
+
+    return message.reply({ embeds: [embed] });
+  }
+
+  // ─── +give ────────────────────────────────────────────────────────────────
+  if (cmd === 'give') {
+    const target = message.mentions.users.first();
+    const objet  = args[1];
+    const qte    = parseInt(args[2]) || 1;
+
+    if (!target || !objet) {
+      return message.reply('❌ Usage : `+give @joueur [objet] [quantité]`');
+    }
+
+    getPlayer(db, target.id);
+    const inv = db.inventory[author.id];
+
+    if (!inv[objet] || inv[objet] < qte) {
+      return message.reply(`❌ Tu n'as pas assez de **${objet}** dans ton inventaire.`);
+    }
+
+    inv[objet] -= qte;
+    if (inv[objet] <= 0) delete inv[objet];
+    db.inventory[target.id][objet] = (db.inventory[target.id][objet] || 0) + qte;
+    saveDB(db);
+
+    return message.reply(`✅ Tu as donné **${qte}x ${objet}** à **${target.username}**.`);
+  }
+
+  // ─── +storage ─────────────────────────────────────────────────────────────
+  if (cmd === 'storage') {
+    const sub = args[0]?.toLowerCase();
+    const storage = db.storage[author.id];
+
+    if (sub === 'unlock') {
+      if (storage.unlocked) return message.reply('❌ Ton stockage est déjà débloqué !');
+      if (db.bank[author.id].cash < 500) return message.reply('❌ Il te faut **500€** en liquide pour débloquer le stockage.');
+
+      db.bank[author.id].cash -= 500;
+      db.storage[author.id].unlocked = true;
+      saveDB(db);
+      return message.reply('✅ Stockage débloqué ! Utilise `+storage` pour y accéder.');
+    }
+
+    if (!storage.unlocked) {
+      return message.reply('❌ Ton stockage n\'est pas encore débloqué. Utilise `+storage unlock` (500€).');
+    }
+
+    const items = Object.entries(storage.items);
+    const embed = new EmbedBuilder()
+      .setTitle(`📦 Stockage de ${db.players[author.id].prenom || author.username}`)
+      .setColor(0xFEE75C)
+      .setDescription(items.length === 0 ? '*Stockage vide*' : items.map(([k, v]) => `• **${k}** x${v}`).join('\n'))
+      .setFooter({ text: 'Astra RP • Stockage' });
+
+    return message.reply({ embeds: [embed] });
+  }
+
   // ─── +salaire ─────────────────────────────────────────────────────────────
   if (cmd === 'salaire') {
     const p = db.players[author.id];
@@ -1832,7 +1976,7 @@ client.on('messageCreate', async message => {
     }
 
     const now = Date.now();
-    const cooldown = 3600000; // 1h
+    const cooldown = 3600000;
     if (now - (p.lastSalaire || 0) < cooldown) {
       const reste = Math.ceil((cooldown - (now - p.lastSalaire)) / 60000);
       return message.reply(`⏳ Prochain salaire disponible dans **${reste} minutes**.`);
@@ -1866,7 +2010,7 @@ client.on('messageCreate', async message => {
     return message.reply({ embeds: [embed] });
   }
 
-  // ─── +setjob (admin ou self avec recrutement) ─────────────────────────────
+  // ─── +setjob (admin) ──────────────────────────────────────────────────────
   if (cmd === 'setjob') {
     if (!isAdmin) return message.reply('❌ Réservé aux administrateurs.');
     const target = message.mentions.users.first();
@@ -1902,7 +2046,6 @@ client.on('messageCreate', async message => {
     if (!isAdmin) return message.reply('❌ Réservé aux administrateurs.');
     const subCmd = args[0]?.toLowerCase();
 
-    // +set salaire [métier] [montant]
     if (subCmd === 'salaire') {
       const jobId   = args[1]?.toLowerCase();
       const montant = parseInt(args[2]);
@@ -1916,7 +2059,6 @@ client.on('messageCreate', async message => {
       return message.reply(`✅ Salaire de **${metier.nom}** mis à jour : **${montant}€/h**`);
     }
 
-    // +set agemin [métier] [âge]
     if (subCmd === 'agemin') {
       const jobId  = args[1]?.toLowerCase();
       const age    = parseInt(args[2]);
@@ -1930,29 +2072,24 @@ client.on('messageCreate', async message => {
       return message.reply(`✅ Âge minimum de **${metier.nom}** mis à jour : **${age} ans**`);
     }
 
-    // +set startcash [montant]
     if (subCmd === 'startcash') {
       const montant = parseInt(args[1]);
       if (isNaN(montant) || montant < 0) return message.reply('❌ Usage : `+set startcash [montant]`');
-      // On met à jour le JSON par défaut (simulé)
       return message.reply(`✅ Argent de départ (liquide) défini à **${montant}€** pour les nouveaux joueurs.`);
     }
 
-    // +set startbank [montant]
     if (subCmd === 'startbank') {
       const montant = parseInt(args[1]);
       if (isNaN(montant) || montant < 0) return message.reply('❌ Usage : `+set startbank [montant]`');
       return message.reply(`✅ Argent de départ (banque) défini à **${montant}€** pour les nouveaux joueurs.`);
     }
 
-    // +set prefix [préfixe]
     if (subCmd === 'prefix') {
       const newPrefix = args[1];
       if (!newPrefix) return message.reply('❌ Usage : `+set prefix [préfixe]`');
       return message.reply(`✅ Préfixe mis à jour : \`${newPrefix}\` *(redémarrage requis pour appliquer)*`);
     }
 
-    // Aide sur +set
     const embed = new EmbedBuilder()
       .setTitle('⚙️ Commandes +set (Admin)')
       .setColor(0xEB459E)
