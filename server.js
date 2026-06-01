@@ -1,6 +1,5 @@
 const http = require('http');
 
-// Petit serveur HTTP pour garder le bot en vie sur Render (free tier)
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end('Astra RP Bot — En ligne ✅');
