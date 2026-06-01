@@ -760,6 +760,9 @@ function getServerStructure() {
 
 // ─── FONCTION SETUP PRINCIPAL ────────────────────────────────────────────────
 async function runSetup(guild, interaction = null) {
+  // Canal depuis lequel la commande a été lancée — on le garde en dernier
+  const originChannelId = interaction?.channelId || null;
+
   const reply = async (msg) => {
     if (interaction) {
       try { await interaction.editReply(msg); } catch {}
@@ -768,9 +771,11 @@ async function runSetup(guild, interaction = null) {
 
   await reply('⏳ **Étape 1/4** — Suppression des anciens salons...');
 
-  // 1. Supprimer tous les salons existants
+  // 1. Supprimer tous les salons existants SAUF le salon d'origine
+  //    (pour que Discord puisse encore recevoir les editReply)
   const channels = [...guild.channels.cache.values()];
   for (const ch of channels) {
+    if (ch.id === originChannelId) continue; // on le garde pour l'instant
     try { await ch.delete(); } catch {}
   }
 
@@ -837,6 +842,21 @@ async function runSetup(guild, interaction = null) {
   }
 
   await reply('✅ **Setup terminé !** Le serveur a été entièrement recréé.');
+
+  // Supprimer le salon d'origine maintenant que tout est fait
+  if (originChannelId) {
+    try {
+      const originCh = guild.channels.cache.get(originChannelId);
+      if (originCh) await originCh.delete();
+    } catch {}
+  }
+
+  // Envoyer un DM à l'admin pour confirmer la fin du setup
+  if (interaction?.user) {
+    try {
+      await interaction.user.send('✅ **Setup Astra RP terminé !** Le serveur a été entièrement recréé avec succès.');
+    } catch {}
+  }
 }
 
 function sleep(ms) {
