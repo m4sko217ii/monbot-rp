@@ -2,9 +2,9 @@
   "name": "astra-rp-bot",
   "version": "1.0.0",
   "description": "Bot Discord RP — Astra RP",
-  "main": "index.js",
+  "main": "bot.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node server.js & node bot.js"
   },
   "dependencies": {
     "discord.js": "^14.16.3",
