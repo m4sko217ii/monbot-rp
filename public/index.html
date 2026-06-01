@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Los Santos RP — Abonnement Bot</title>
+<title>Astra RP — Abonnement Bot</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet"/>
 <style>
   :root {
@@ -25,34 +25,27 @@
     overflow-x: hidden;
   }
 
-  /* BACKGROUND */
   body::before {
     content: '';
-    position: fixed;
-    inset: 0;
+    position: fixed; inset: 0;
     background:
       radial-gradient(ellipse 80% 40% at 50% -10%, rgba(232,33,42,0.18) 0%, transparent 70%),
       radial-gradient(ellipse 50% 30% at 80% 80%, rgba(245,197,24,0.08) 0%, transparent 60%);
-    pointer-events: none;
-    z-index: 0;
+    pointer-events: none; z-index: 0;
   }
 
-  /* GRID OVERLAY */
   body::after {
     content: '';
-    position: fixed;
-    inset: 0;
+    position: fixed; inset: 0;
     background-image:
       linear-gradient(rgba(232,33,42,0.04) 1px, transparent 1px),
       linear-gradient(90deg, rgba(232,33,42,0.04) 1px, transparent 1px);
     background-size: 60px 60px;
-    pointer-events: none;
-    z-index: 0;
+    pointer-events: none; z-index: 0;
   }
 
   .wrap { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 0 20px; }
 
-  /* NAV */
   nav {
     display: flex; align-items: center; justify-content: space-between;
     padding: 24px 40px;
@@ -61,19 +54,17 @@
   }
   .logo {
     font-family: 'Bebas Neue', sans-serif;
-    font-size: 28px;
-    letter-spacing: 3px;
+    font-size: 28px; letter-spacing: 3px;
     color: var(--red);
     text-shadow: 0 0 30px rgba(232,33,42,0.5);
   }
   .logo span { color: var(--gold); }
   .nav-link {
-    color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 600;
-    letter-spacing: 1px; text-transform: uppercase; transition: color .2s;
+    color: var(--muted); text-decoration: none; font-size: 14px;
+    font-weight: 600; letter-spacing: 1px; text-transform: uppercase; transition: color .2s;
   }
   .nav-link:hover { color: var(--text); }
 
-  /* HERO */
   .hero {
     text-align: center;
     padding: 80px 20px 60px;
@@ -94,9 +85,7 @@
   .hero h1 {
     font-family: 'Bebas Neue', sans-serif;
     font-size: clamp(52px, 10vw, 90px);
-    line-height: .95;
-    letter-spacing: 4px;
-    margin-bottom: 20px;
+    line-height: .95; letter-spacing: 4px; margin-bottom: 20px;
   }
   .hero h1 .line1 { display: block; color: var(--text); }
   .hero h1 .line2 { display: block; color: var(--red); text-shadow: 0 0 60px rgba(232,33,42,0.6); }
@@ -111,10 +100,9 @@
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 40px;
-    max-width: 560px;
-    margin: 0 auto 80px;
-    position: relative;
-    overflow: hidden;
+    max-width: 580px;
+    margin: 0 auto 40px;
+    position: relative; overflow: hidden;
   }
   .form-card::before {
     content: '';
@@ -141,8 +129,40 @@
     outline: none; transition: border-color .2s;
   }
   .field input:focus { border-color: var(--red); }
+  .field .hint {
+    font-size: 12px; color: var(--muted); margin-top: 6px;
+    font-style: italic;
+  }
 
-  /* MONTHS SELECTOR */
+  /* TUTO */
+  .tuto-box {
+    background: rgba(245,197,24,0.06);
+    border: 1px solid rgba(245,197,24,0.2);
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+  }
+  .tuto-box .tuto-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--gold); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .tuto-steps {
+    list-style: none; padding: 0;
+  }
+  .tuto-steps li {
+    font-size: 13px; color: var(--muted); padding: 4px 0;
+    display: flex; align-items: flex-start; gap: 8px; line-height: 1.5;
+  }
+  .tuto-steps li .step-num {
+    background: rgba(245,197,24,0.15); border: 1px solid rgba(245,197,24,0.3);
+    color: var(--gold); font-size: 10px; font-weight: 700;
+    min-width: 20px; height: 20px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 1px; flex-shrink: 0;
+  }
+
+  /* MONTHS */
   .months-grid {
     display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
     margin-bottom: 28px;
@@ -162,8 +182,7 @@
   }
   .month-btn.selected::after {
     content: '✓'; position: absolute; top: 4px; right: 6px;
-    font-size: 10px; color: var(--gold);
-    font-family: 'Rajdhani', sans-serif;
+    font-size: 10px; color: var(--gold); font-family: 'Rajdhani', sans-serif;
   }
 
   .total-display {
@@ -196,6 +215,14 @@
   }
   .paypal-note span { color: #009cde; font-weight: 700; }
 
+  .loading { display: none; text-align: center; padding: 20px; }
+  .spinner {
+    width: 36px; height: 36px; border: 3px solid var(--border);
+    border-top-color: var(--red); border-radius: 50%;
+    animation: spin .7s linear infinite; margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
   /* FEATURES */
   .features {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -211,15 +238,6 @@
   .feat h3 { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 2px; margin-bottom: 6px; }
   .feat p { font-size: 13px; color: var(--muted); line-height: 1.5; }
 
-  /* LOADING */
-  .loading { display: none; text-align: center; padding: 20px; }
-  .spinner {
-    width: 36px; height: 36px; border: 3px solid var(--border);
-    border-top-color: var(--red); border-radius: 50%;
-    animation: spin .7s linear infinite; margin: 0 auto 12px;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
   footer {
     text-align: center; padding: 30px; border-top: 1px solid var(--border);
     font-size: 12px; color: var(--muted); position: relative; z-index: 1;
@@ -229,33 +247,47 @@
 <body>
 
 <nav>
-  <div class="logo">LOS<span>.</span>SANTOS <span style="color:var(--text);font-size:16px;letter-spacing:1px;">RP</span></div>
+  <div class="logo">ASTRA<span>.</span>RP</div>
   <a href="/admin" class="nav-link">Admin →</a>
 </nav>
 
 <div class="wrap">
   <section class="hero">
-    <div class="hero-badge">🔴 Bot Actif — Los Santos</div>
+    <div class="hero-badge">🔴 Bot Actif — Astra RP</div>
     <h1>
-      <span class="line1">Accès au</span>
+      <span class="line1">Abonnement</span>
       <span class="line2">Bot GTA RP</span>
     </h1>
-    <p>Accède à tous les systèmes du serveur — banque, drogue, armes, braquage, police et plus encore. Abonnement mensuel, résiliable à tout moment.</p>
+    <p>Active le bot sur ton serveur Discord — tous tes membres auront accès à toutes les commandes. Banque, drogue, armes, braquage, police et plus encore.</p>
   </section>
 
   <div class="form-card">
     <h2>🛒 Choisir ton abonnement</h2>
 
     <div class="field">
-      <label>Ton Discord ID</label>
-      <input type="text" id="discordId" placeholder="ex: 123456789012345678" />
-    </div>
-    <div class="field">
-      <label>Ton pseudo Discord</label>
-      <input type="text" id="discordName" placeholder="ex: Medhi#0001" />
+      <label>ID de ton serveur Discord</label>
+      <input type="text" id="guildId" placeholder="ex: 1234567890123456789"/>
+      <div class="hint">Tous les membres de ce serveur auront accès au bot.</div>
     </div>
 
-    <label style="display:block;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">Durée</label>
+    <div class="field">
+      <label>Ton nom d'utilisateur Discord</label>
+      <input type="text" id="discordName" placeholder="ex: joshua"/>
+    </div>
+
+    <!-- TUTO -->
+    <div class="tuto-box">
+      <div class="tuto-title">📖 Comment trouver l'ID de ton serveur ?</div>
+      <ul class="tuto-steps">
+        <li><span class="step-num">1</span> Ouvre Discord et va dans <strong>Paramètres utilisateur</strong> (icône ⚙️ en bas à gauche)</li>
+        <li><span class="step-num">2</span> Dans l'onglet <strong>Avancé</strong>, active le <strong>Mode développeur</strong></li>
+        <li><span class="step-num">3</span> Ferme les paramètres et reviens sur ton serveur</li>
+        <li><span class="step-num">4</span> Appuie longuement sur l'icône de ton serveur dans la barre latérale gauche</li>
+        <li><span class="step-num">5</span> Clique sur <strong>Copier l'identifiant du serveur</strong> — c'est ton ID !</li>
+      </ul>
+    </div>
+
+    <label style="display:block;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">Durée de l'abonnement</label>
     <div class="months-grid">
       <div class="month-btn" data-months="1">1<br><span class="price">10€</span></div>
       <div class="month-btn" data-months="2">2<br><span class="price">20€</span></div>
@@ -281,39 +313,15 @@
 </div>
 
 <div class="features">
-  <div class="feat">
-    <div class="feat-icon">🏦</div>
-    <h3>Banque & Économie</h3>
-    <p>Compte bancaire, virements, dépôts, retraits. Gère ta fortune à Los Santos.</p>
-  </div>
-  <div class="feat">
-    <div class="feat-icon">🔫</div>
-    <h3>Braquage</h3>
-    <p>Braque des banques et magasins. Gains importants, risques élevés.</p>
-  </div>
-  <div class="feat">
-    <div class="feat-icon">💊</div>
-    <h3>Drogue & Armes</h3>
-    <p>Fabrique et revend drogue et armes sur le marché noir clandestin.</p>
-  </div>
-  <div class="feat">
-    <div class="feat-icon">🚔</div>
-    <h3>Système Police</h3>
-    <p>Wanted, amendes, fouilles, retrait de permis. La loi de Los Santos.</p>
-  </div>
-  <div class="feat">
-    <div class="feat-icon">💰</div>
-    <h3>Racket</h3>
-    <p>Extorque tes ennemis et accumule des richesses illégalement.</p>
-  </div>
-  <div class="feat">
-    <div class="feat-icon">🪪</div>
-    <h3>Identité & Permis</h3>
-    <p>Carte d'identité RP, permis de conduire avec système de points.</p>
-  </div>
+  <div class="feat"><div class="feat-icon">🏦</div><h3>Banque & Économie</h3><p>Compte bancaire, virements, dépôts, retraits. Gère ta fortune à Los Santos.</p></div>
+  <div class="feat"><div class="feat-icon">🔫</div><h3>Braquage</h3><p>Braque des banques et magasins. Gains importants, risques élevés.</p></div>
+  <div class="feat"><div class="feat-icon">💊</div><h3>Drogue & Armes</h3><p>Fabrique et revend drogue et armes sur le marché noir clandestin.</p></div>
+  <div class="feat"><div class="feat-icon">🚔</div><h3>Système Police</h3><p>Wanted, amendes, fouilles, retrait de permis. La loi de Los Santos.</p></div>
+  <div class="feat"><div class="feat-icon">🛡️</div><h3>Modération</h3><p>Ban, kick, mute, warn, clear et plus. Garde ton serveur sous contrôle.</p></div>
+  <div class="feat"><div class="feat-icon">🪪</div><h3>Identité & Permis</h3><p>Carte d'identité RP, permis de conduire avec système de points.</p></div>
 </div>
 
-<footer>© 2025 Los Santos RP — Tous droits réservés</footer>
+<footer>© 2025 Astra RP — Tous droits réservés</footer>
 
 <script>
   let selectedMonths = 6;
@@ -330,21 +338,22 @@
   });
 
   async function startPayment() {
-    const discordId = document.getElementById('discordId').value.trim();
+    const guildId     = document.getElementById('guildId').value.trim();
     const discordName = document.getElementById('discordName').value.trim();
-    if (!discordId || !discordName) return alert('⚠️ Remplis ton Discord ID et ton pseudo !');
-    if (!/^\d{17,19}$/.test(discordId)) return alert('⚠️ L\'ID Discord doit contenir 17-19 chiffres.');
 
-    const btn = document.getElementById('payBtn');
+    if (!guildId || !discordName) return alert('⚠️ Remplis l\'ID du serveur et ton nom d\'utilisateur !');
+    if (!/^\d{17,20}$/.test(guildId)) return alert('⚠️ L\'ID du serveur doit contenir 17 à 20 chiffres.');
+
+    const btn     = document.getElementById('payBtn');
     const loading = document.getElementById('loading');
-    btn.disabled = true;
+    btn.disabled  = true;
     loading.style.display = 'block';
 
     try {
       const res = await fetch('/api/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ discordId, discordName, months: selectedMonths })
+        body: JSON.stringify({ guildId, discordName, months: selectedMonths })
       });
       const data = await res.json();
       if (data.approvalUrl) {
