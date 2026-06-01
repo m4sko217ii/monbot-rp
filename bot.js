@@ -1,5 +1,6 @@
 const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, SlashCommandBuilder, REST, Routes, ChannelType } = require('discord.js');
 const fs = require('fs');
+const axios = require('axios');
 
 const client = new Client({
   intents: [
@@ -13,10 +14,43 @@ const client = new Client({
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
+const SITE_URL = process.env.SITE_URL || 'http://localhost:3000';
 
 if (!TOKEN || !CLIENT_ID) {
   console.error('❌ TOKEN ou CLIENT_ID manquant !');
   process.exit(1);
+}
+
+// ─── COMMANDES LIBRES (Sans abonnement) ──────────────────────────────────────
+const FREE_COMMANDS = [
+  'help', 'metiers', 'setup'
+];
+
+// ─── VÉRIFICATION ABONNEMENT ────────────────────────────────────────────────
+async function checkSubscription(guildId) {
+  try {
+    const res = await axios.get(`${SITE_URL}/api/check-guild/${guildId}`, { timeout: 5000 });
+    return res.data;
+  } catch (err) {
+    console.error('⚠️ Impossible de vérifier l\'abonnement:', err.message);
+    return { access: false, daysLeft: 0, reason: 'Site injoignable' };
+  }
+}
+
+function noSubEmbed(daysLeft = null) {
+  const desc = daysLeft === null
+    ? `Tu n'as pas d'abonnement actif.\nAbonne-toi sur **[notre site](${SITE_URL})** pour accéder au bot !\n\n**Comment ça marche :**\n1. Va sur le site\n2. Rentre ton **Guild ID** et **Username**\n3. Finis ton paiement\n4. Le bot sera accessible pendant 30 jours !`
+    : `Ton abonnement a expiré ! Il te restait ${daysLeft} jours.\nRenouvelle-le sur **[notre site](${SITE_URL})**.`;
+  
+  return new EmbedBuilder()
+    .setTitle('🔒 Accès refusé — Abonnement requis')
+    .setColor(0xe8212a)
+    .setDescription(desc)
+    .addFields(
+      { name: '💳 Prix', value: '10€/mois', inline: true },
+      { name: '🌐 Site', value: `[Cliquer ici](${SITE_URL})`, inline: true }
+    )
+    .setFooter({ text: 'Astra RP • Abonnement' });
 }
 
 // ─── BASE DE DONNÉES SIMPLE (JSON) ───────────────────────────────────────────
@@ -48,7 +82,7 @@ function saveDB(db) {
 // ─── LOG MODÉRATION ────────────────────────────────────────────────────────
 async function logModeration(guild, embed) {
   try {
-    const logChan = guild.channels.cache.find(c => c.name === 'logs-bot' || c.name === '📋・logs-bot');
+    const logChan = guild.channels.cache.find(c => c.name === 'logs-bot' || c.name === '📋-logs-moderation' || c.name === 'logs-moderation');
     if (logChan && logChan.isTextBased()) {
       await logChan.send({ embeds: [embed] });
     }
@@ -134,7 +168,6 @@ client.on('ready', async () => {
   console.log(`✅ Bot connecté : ${client.user.username} (${client.user.id})`);
   client.user.setActivity('+help | Astra RP', { type: 'WATCHING' });
 
-  // Enregistrer les slash commands
   try {
     const commands = [
       new SlashCommandBuilder()
@@ -159,11 +192,9 @@ client.on('interactionCreate', async (interaction) => {
     if (!interaction.isCommand()) return;
 
     const { commandName, guild, user } = interaction;
-
-    // Vérifier si admin
     const isAdmin = interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator);
 
-    // ─── /setup ───────────────────────────────────────────────────────────
+    // /setup ne nécessite pas d'abonnement
     if (commandName === 'setup') {
       if (!isAdmin) {
         return interaction.reply({ content: '❌ Seuls les administrateurs peuvent faire le setup.', ephemeral: true });
@@ -172,7 +203,6 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.deferReply({ ephemeral: false });
 
       try {
-        // Créer la catégorie principale
         const category = await guild.channels.create({
           name: '📋 ASTRA RP',
           type: ChannelType.GuildCategory,
@@ -184,8 +214,7 @@ client.on('interactionCreate', async (interaction) => {
           ],
         });
 
-        // Créer les salons
-        const channels = [
+        const textChannels = [
           { name: '📰-annonces', type: ChannelType.GuildText },
           { name: '💬-general', type: ChannelType.GuildText },
           { name: '👥-profils', type: ChannelType.GuildText },
@@ -195,11 +224,11 @@ client.on('interactionCreate', async (interaction) => {
           { name: '🏥-sante', type: ChannelType.GuildText },
           { name: '🚗-transport', type: ChannelType.GuildText },
           { name: '🎭-rp', type: ChannelType.GuildText },
-          { name: '⚙️-logs-bot', type: ChannelType.GuildText },
+          { name: '📋-logs-bot', type: ChannelType.GuildText },
           { name: '📋-logs-moderation', type: ChannelType.GuildText },
         ];
 
-        for (const channelData of channels) {
+        for (const channelData of textChannels) {
           await guild.channels.create({
             name: channelData.name,
             type: channelData.type,
@@ -213,7 +242,29 @@ client.on('interactionCreate', async (interaction) => {
           });
         }
 
-        // Créer les rôles
+        // Créer les salons VOCAUX
+        const voiceChannels = [
+          { name: '🎤 Général', type: ChannelType.GuildVoice },
+          { name: '🎤 RP', type: ChannelType.GuildVoice },
+          { name: '🎤 Police', type: ChannelType.GuildVoice },
+          { name: '🎤 Médecin', type: ChannelType.GuildVoice },
+          { name: '🎤 Pompier', type: ChannelType.GuildVoice },
+        ];
+
+        for (const channelData of voiceChannels) {
+          await guild.channels.create({
+            name: channelData.name,
+            type: channelData.type,
+            parent: category.id,
+            permissionOverwrites: [
+              {
+                id: guild.id,
+                allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.Connect, PermissionsBitField.Flags.Speak],
+              },
+            ],
+          });
+        }
+
         const roles = [
           { name: '👮 Police', color: 0x0099FF },
           { name: '🏥 Médecin', color: 0x00FF00 },
@@ -235,11 +286,13 @@ client.on('interactionCreate', async (interaction) => {
         const embed = new EmbedBuilder()
           .setTitle('✅ Setup terminé!')
           .setColor(0x57F287)
-          .setDescription('Tous les salons et rôles ont été créés avec succès.')
+          .setDescription('Tous les salons, salons vocaux et rôles ont été créés avec succès.')
           .addFields(
             { name: '📋 Catégorie', value: `${category.name}`, inline: false },
-            { name: '💬 Salons créés', value: `${channels.length} salons`, inline: true },
-            { name: '👥 Rôles créés', value: `${roles.length} rôles`, inline: true }
+            { name: '💬 Salons texte créés', value: `${textChannels.length} salons`, inline: true },
+            { name: '🎤 Salons vocaux créés', value: `${voiceChannels.length} salons`, inline: true },
+            { name: '👥 Rôles créés', value: `${roles.length} rôles`, inline: true },
+            { name: '📝 Prochaine étape', value: 'Tape `+setregle` pour générer les descriptions des salons et règles !', inline: false }
           )
           .setFooter({ text: 'Astra RP' })
           .setTimestamp();
@@ -271,12 +324,18 @@ client.on('messageCreate', async (message) => {
     const author = message.author;
     const guild = message.guild;
 
-    // Charger DB
     let db = loadDB();
     db = getPlayer(db, author.id);
 
-    // Vérifier si admin
     const isAdmin = message.member.permissions.has(PermissionsBitField.Flags.Administrator);
+
+    // ─── VÉRIFIER ABONNEMENT (sauf pour les commandes libres) ──────────────
+    if (!FREE_COMMANDS.includes(cmd)) {
+      const sub = await checkSubscription(guild.id);
+      if (!sub.access) {
+        return message.reply({ embeds: [noSubEmbed(sub.daysLeft)] });
+      }
+    }
 
     // ─── +help ───────────────────────────────────────────────────────────────
     if (cmd === 'help') {
@@ -285,8 +344,9 @@ client.on('messageCreate', async (message) => {
         .setColor(0x5865F2)
         .addFields(
           { name: '💬 Commandes de base', value: '`+profil` — Voir ton profil\n`+solde` — Voir ton argent\n`+metiers` — Voir les métiers\n`+inventaire` — Voir ton inventaire' },
-          { name: '👮 Commandes RP', value: '`+arrest @joueur [raison]` — Arrêter quelqu\'un\n`+release @joueur` — Libérer quelqu\'un' },
-          { name: '⚙️ Admin', value: '`+setjob @joueur [métier]` — Changer le métier\n`+warn @joueur [raison]` — Avertir\n`+stats` — Statistiques' }
+          { name: '👮 Commandes RP', value: '`+arrest @joueur [raison]` — Arrêter\n`+release @joueur` — Libérer' },
+          { name: '🛡️ Modération', value: '`+ban @joueur [raison]` — Bannir\n`+kick @joueur [raison]` — Expulser\n`+mute @joueur [raison]` — Mute\n`+unmute @joueur` — Unmute\n`+clear [nombre]` — Supprimer des messages' },
+          { name: '⚙️ Admin', value: '`+setjob @joueur [métier]` — Changer métier\n`+warn @joueur [raison]` — Avertir\n`+stats` — Statistiques' }
         )
         .setFooter({ text: 'Astra RP' })
         .setTimestamp();
@@ -362,7 +422,7 @@ client.on('messageCreate', async (message) => {
       return message.reply({ embeds: [embed] });
     }
 
-    // ─── +arrest (Police) ─────────────────────────────────────────────────
+    // ─── +arrest ──────────────────────────────────────────────────────────
     if (cmd === 'arrest') {
       const target = message.mentions.users.first();
       const raison = args.slice(1).join(' ') || 'Non spécifiée';
@@ -393,7 +453,7 @@ client.on('messageCreate', async (message) => {
       return message.reply(`✅ **${target.username}** a été arrêté pour : ${raison}`);
     }
 
-    // ─── +release (Police) ────────────────────────────────────────────────
+    // ─── +release ─────────────────────────────────────────────────────────
     if (cmd === 'release') {
       const target = message.mentions.users.first();
 
@@ -416,6 +476,154 @@ client.on('messageCreate', async (message) => {
 
       await logModeration(guild, embed);
       return message.reply(`✅ **${target.username}** a été libéré.`);
+    }
+
+    // ─── +ban (Modération) ────────────────────────────────────────────────
+    if (cmd === 'ban') {
+      if (!isAdmin) return message.reply('❌ Réservé aux administrateurs.');
+      
+      const target = message.mentions.users.first();
+      const raison = args.slice(1).join(' ') || 'Aucune raison';
+
+      if (!target) return message.reply('❌ Usage : `+ban @joueur [raison]`');
+
+      try {
+        await guild.members.ban(target, { reason: raison });
+
+        const embed = new EmbedBuilder()
+          .setTitle('🔨 Ban')
+          .setColor(0xED4245)
+          .addFields(
+            { name: 'Joueur banni', value: target.tag, inline: true },
+            { name: 'Raison', value: raison, inline: true },
+            { name: 'Par', value: author.tag, inline: true }
+          )
+          .setTimestamp();
+
+        await logModeration(guild, embed);
+        return message.reply(`✅ **${target.username}** a été banni.`);
+      } catch (err) {
+        return message.reply(`❌ Erreur : ${err.message}`);
+      }
+    }
+
+    // ─── +kick (Modération) ───────────────────────────────────────────────
+    if (cmd === 'kick') {
+      if (!isAdmin) return message.reply('❌ Réservé aux administrateurs.');
+      
+      const target = message.mentions.users.first();
+      const raison = args.slice(1).join(' ') || 'Aucune raison';
+
+      if (!target) return message.reply('❌ Usage : `+kick @joueur [raison]`');
+
+      try {
+        const member = await guild.members.fetch(target.id);
+        await member.kick(raison);
+
+        const embed = new EmbedBuilder()
+          .setTitle('👢 Kick')
+          .setColor(0xFF6600)
+          .addFields(
+            { name: 'Joueur expulsé', value: target.tag, inline: true },
+            { name: 'Raison', value: raison, inline: true },
+            { name: 'Par', value: author.tag, inline: true }
+          )
+          .setTimestamp();
+
+        await logModeration(guild, embed);
+        return message.reply(`✅ **${target.username}** a été expulsé.`);
+      } catch (err) {
+        return message.reply(`❌ Erreur : ${err.message}`);
+      }
+    }
+
+    // ─── +mute (Modération) ───────────────────────────────────────────────
+    if (cmd === 'mute') {
+      if (!isAdmin) return message.reply('❌ Réservé aux administrateurs.');
+      
+      const target = message.mentions.users.first();
+      const raison = args.slice(1).join(' ') || 'Aucune raison';
+
+      if (!target) return message.reply('❌ Usage : `+mute @joueur [raison]`');
+
+      try {
+        const member = await guild.members.fetch(target.id);
+        await member.timeout(3600000, raison); // 1 heure
+
+        const embed = new EmbedBuilder()
+          .setTitle('🔇 Mute')
+          .setColor(0xFEE75C)
+          .addFields(
+            { name: 'Joueur muté', value: target.tag, inline: true },
+            { name: 'Durée', value: '1 heure', inline: true },
+            { name: 'Raison', value: raison, inline: true },
+            { name: 'Par', value: author.tag, inline: true }
+          )
+          .setTimestamp();
+
+        await logModeration(guild, embed);
+        return message.reply(`✅ **${target.username}** a été muté pour 1 heure.`);
+      } catch (err) {
+        return message.reply(`❌ Erreur : ${err.message}`);
+      }
+    }
+
+    // ─── +unmute (Modération) ─────────────────────────────────────────────
+    if (cmd === 'unmute') {
+      if (!isAdmin) return message.reply('❌ Réservé aux administrateurs.');
+      
+      const target = message.mentions.users.first();
+
+      if (!target) return message.reply('❌ Usage : `+unmute @joueur`');
+
+      try {
+        const member = await guild.members.fetch(target.id);
+        await member.timeout(null);
+
+        const embed = new EmbedBuilder()
+          .setTitle('🔊 Unmute')
+          .setColor(0x57F287)
+          .addFields(
+            { name: 'Joueur démuté', value: target.tag, inline: true },
+            { name: 'Par', value: author.tag, inline: true }
+          )
+          .setTimestamp();
+
+        await logModeration(guild, embed);
+        return message.reply(`✅ **${target.username}** a été démuté.`);
+      } catch (err) {
+        return message.reply(`❌ Erreur : ${err.message}`);
+      }
+    }
+
+    // ─── +clear (Modération) ──────────────────────────────────────────────
+    if (cmd === 'clear') {
+      if (!isAdmin) return message.reply('❌ Réservé aux administrateurs.');
+      
+      const nombre = parseInt(args[0]) || 10;
+
+      if (nombre < 1 || nombre > 100) {
+        return message.reply('❌ Usage : `+clear [nombre]` (1-100)');
+      }
+
+      try {
+        await message.channel.bulkDelete(nombre, true);
+
+        const embed = new EmbedBuilder()
+          .setTitle('🗑️ Clear')
+          .setColor(0x5865F2)
+          .addFields(
+            { name: 'Messages supprimés', value: `${nombre}`, inline: true },
+            { name: 'Salon', value: message.channel.name, inline: true },
+            { name: 'Par', value: author.tag, inline: true }
+          )
+          .setTimestamp();
+
+        await logModeration(guild, embed);
+        return message.reply(`✅ **${nombre}** messages supprimés.`).then(msg => setTimeout(() => msg.delete(), 5000));
+      } catch (err) {
+        return message.reply(`❌ Erreur : ${err.message}`);
+      }
     }
 
     // ─── +setjob (Admin) ──────────────────────────────────────────────────
@@ -478,6 +686,186 @@ client.on('messageCreate', async (message) => {
       await logModeration(guild, embed);
       try { await target.send({ embeds: [embed] }); } catch {}
       return message.reply({ embeds: [embed] });
+    }
+
+    // ─── +setregle (Admin) ───────────────────────────────────────────────
+    if (cmd === 'setregle') {
+      if (!isAdmin) return message.reply('❌ Réservé aux administrateurs.');
+
+      // Règles générales
+      const reglesGenerales = [
+        {
+          titre: '📋 Règles Générales',
+          description: '1️⃣ **Respect mutuel** — Soyez respectueux envers tous les joueurs\n2️⃣ **Pas de spam** — Évitez le flood et le spam de messages\n3️⃣ **Pas d\'insultes** — Les insultes sont interdites\n4️⃣ **Français obligatoire** — Parlez uniquement en français\n5️⃣ **Pas de cheating** — Les exploits/bugs sont interdits'
+        },
+        {
+          titre: '🎭 Règles RP',
+          description: '1️⃣ **Respect du RP** — Restez dans vos rôles\n2️⃣ **Pas de MG (Metagaming)** — Ne pas utiliser les infos OOC en IC\n3️⃣ **Pas de PG (PowerGaming)** — Ne pas forcer les actions\n4️⃣ **Immersion** — Utilisez /me /do /ooc pour vos actions\n5️⃣ **Personnage cohérent** — Gardez votre perso constant'
+        },
+        {
+          titre: '👮 Règles de Modération',
+          description: '1️⃣ **Écoute les modérateurs** — Respectez les décisions des modérateurs\n2️⃣ **Pas d\'appel privé** — Réclamez en modmail\n3️⃣ **Pas de discrim** — Aucune discrimination tolérée\n4️⃣ **Pas de doxxing** — Respectez la vie privée\n5️⃣ **Pas de pub** — Les pubs sont interdites'
+        },
+        {
+          titre: '⚙️ Sanctions',
+          description: '⚠️ **Warn** — Avertissement\n🔇 **Mute** — Silence temporaire\n👢 **Kick** — Expulsion du serveur\n🔨 **Ban** — Bannissement permanent\n\n*Les sanctions dépendent de la gravité de l\'infraction.*'
+        }
+      ];
+
+      // Descriptions des salons
+      const salonDescriptions = [
+        {
+          titre: '📰 Salon #annonces',
+          description: 'Pour les annonces officielles du serveur et les mises à jour.\n\n**Commandes utiles :**\n• Aucune commande\n\n**À faire :** Consulter régulièrement les annonces'
+        },
+        {
+          titre: '💬 Salon #general',
+          description: 'Discussions générales et hors-RP (OOC).\n\n**Commandes utiles :**\n• `+help` — Voir l\'aide\n• `+metiers` — Voir les métiers\n\n**À faire :** Soyez respectueux et courtois'
+        },
+        {
+          titre: '👥 Salon #profils',
+          description: 'Affichage des profils RP des joueurs.\n\n**Commandes utiles :**\n• `+profil` — Voir ton profil\n• `+profil @joueur` — Voir le profil de quelqu\'un\n\n**À faire :** Consulter les profils avant interactions RP'
+        },
+        {
+          titre: '💼 Salon #metiers',
+          description: 'Informations sur les métiers et emplois disponibles.\n\n**Commandes utiles :**\n• `+metiers` — Voir tous les métiers\n• `+setjob @joueur [métier]` — Changer de métier (Admin)\n\n**À faire :** Choisir votre métier'
+        },
+        {
+          titre: '🏦 Salon #banque',
+          description: 'Gestion de l\'argent et transactions bancaires.\n\n**Commandes utiles :**\n• `+solde` — Voir ton argent\n• `+solde @joueur` — Voir le solde d\'un joueur\n\n**À faire :** Gérer votre finance IC'
+        },
+        {
+          titre: '⚖️ Salon #justice',
+          description: 'Procédures judiciaires et arrestations RP.\n\n**Commandes utiles :**\n• `+arrest @joueur [raison]` — Arrêter quelqu\'un\n• `+release @joueur` — Libérer quelqu\'un\n\n**À faire :** Respecter la justice IC'
+        },
+        {
+          titre: '🏥 Salon #sante',
+          description: 'Soins médicaux et urgences RP.\n\n**Commandes utiles :**\n• Zona réservée aux Médecins\n\n**À faire :** Appeler un médecin en cas de besoin'
+        },
+        {
+          titre: '🚗 Salon #transport',
+          description: 'Discussions sur les véhicules et transports RP.\n\n**Commandes utiles :**\n• Zona réservée aux Mécaniciens\n\n**À faire :** Entretenir vos véhicules'
+        },
+        {
+          titre: '🎭 Salon #rp',
+          description: 'Actions et échanges RP (scènes principales).\n\n**Commandes utiles :**\n• `/me [action]` — Effectuer une action\n• `/do [description]` — Décrire quelque chose\n• `/ooc [message]` — Parler hors-RP\n\n**À faire :** Rester dans vos rôles'
+        },
+        {
+          titre: '📋 Salon #logs-bot',
+          description: 'Logs automatiques des actions du bot (bans, kicks, mutes, etc).\n\n**Lecture seule** — Les modérateurs suivent ici les actions du serveur.'
+        },
+        {
+          titre: '📋 Salon #logs-moderation',
+          description: 'Logs des avertissements et sanctions (warns).\n\n**Lecture seule** — Historique de modération.'
+        }
+      ];
+
+      try {
+        // Envoyer les règles générales
+        for (const regle of reglesGenerales) {
+          const embed = new EmbedBuilder()
+            .setTitle(regle.titre)
+            .setDescription(regle.description)
+            .setColor(0x5865F2)
+            .setFooter({ text: 'Astra RP • Règles' });
+          
+          await message.channel.send({ embeds: [embed] });
+        }
+
+        // Envoyer les descriptions des salons
+        await message.channel.send('');
+        const embedSeparator = new EmbedBuilder()
+          .setTitle('📍 Guide des Salons')
+          .setDescription('Voici le guide complet de chaque salon et des commandes utiles :')
+          .setColor(0xEB459E)
+          .setFooter({ text: 'Astra RP • Salons' });
+        await message.channel.send({ embeds: [embedSeparator] });
+
+        for (const salon of salonDescriptions) {
+          const embed = new EmbedBuilder()
+            .setTitle(salon.titre)
+            .setDescription(salon.description)
+            .setColor(0xFEE75C)
+            .setFooter({ text: 'Astra RP • Salons' });
+          
+          await message.channel.send({ embeds: [embed] });
+        }
+
+        return message.reply(`✅ **${reglesGenerales.length + salonDescriptions.length + 1}** messages de configuration générés !`);
+      } catch (err) {
+        return message.reply(`❌ Erreur : ${err.message}`);
+      }
+    }
+
+    // ─── +setrenseignement (Admin) ────────────────────────────────────────
+    if (cmd === 'setrenseignement') {
+      if (!isAdmin) return message.reply('❌ Réservé aux administrateurs.');
+
+      const metierDetails = [
+        {
+          emoji: '👮',
+          nom: 'Police Nationale',
+          salaire: '2500€/h',
+          description: 'Protéger les citoyens et maintenir l\'ordre public.',
+          conditions: '• Âge minimum : 15 ans (IC)\n• Casier judiciaire vierge\n• Formation obligatoire',
+          devoirs: '• Patrouiller régulièrement\n• Arrêter les criminels\n• Respecter le code de déontologie\n• Communication radio obligatoire'
+        },
+        {
+          emoji: '🏥',
+          nom: 'Médecin / SAMU',
+          salaire: '3500€/h',
+          description: 'Soigner les blessés et gérer les urgences médicales.',
+          conditions: '• Âge minimum : 18 ans (IC)\n• Diplôme de médecine requis\n• Formation SAMU',
+          devoirs: '• Répondre aux urgences médicales\n• Respecter le secret médical\n• Tenir les dossiers patients\n• Être disponible en permanence'
+        },
+        {
+          emoji: '🚒',
+          nom: 'Pompier / Secours',
+          salaire: '2800€/h',
+          description: 'Intervenir sur les incendies, accidents et catastrophes.',
+          conditions: '• Âge minimum : 16 ans (IC)\n• Bonne condition physique\n• Formation PSC1',
+          devoirs: '• Intervenir sur les urgences\n• Sauver les vies\n• Évaluer les risques\n• Coordonner avec la police et SAMU'
+        },
+        {
+          emoji: '🔧',
+          nom: 'Mécanicien',
+          salaire: '2200€/h',
+          description: 'Réparer les véhicules et effectuer des révisions.',
+          conditions: '• Âge minimum : 15 ans (IC)\n• Permis de conduire obligatoire\n• Connaissances mécaniques',
+          devoirs: '• Réparer les véhicules\n• Afficher les tarifs\n• Faire des devis\n• Respecter les délais'
+        },
+        {
+          emoji: '💊',
+          nom: 'Pharmacien',
+          salaire: '3000€/h',
+          description: 'Délivrer les médicaments et gérer les stocks.',
+          conditions: '• Âge minimum : 18 ans (IC)\n• Diplôme de pharmacie requis\n• Licence commerciale',
+          devoirs: '• Vendre les médicaments\n• Vérifier les ordonnances\n• Gérer l\'inventaire\n• Respecter les lois sanitaires'
+        }
+      ];
+
+      try {
+        let message_count = 0;
+        for (const metier of metierDetails) {
+          const embed = new EmbedBuilder()
+            .setTitle(`${metier.emoji} ${metier.nom}`)
+            .setColor(0xEB459E)
+            .addFields(
+              { name: '💰 Salaire', value: metier.salaire, inline: true },
+              { name: '📖 Description', value: metier.description, inline: false },
+              { name: '✅ Conditions d\'accès', value: metier.conditions, inline: false },
+              { name: '📋 Devoirs', value: metier.devoirs, inline: false }
+            )
+            .setFooter({ text: 'Astra RP • Métiers' });
+          
+          await message.channel.send({ embeds: [embed] });
+          message_count++;
+        }
+
+        return message.reply(`✅ **${message_count}** renseignements métiers générés !`);
+      } catch (err) {
+        return message.reply(`❌ Erreur : ${err.message}`);
+      }
     }
 
     // ─── +stats (Admin) ───────────────────────────────────────────────────
